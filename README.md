@@ -13,7 +13,7 @@ This repository is a copy of the official challenge repository ([RoQTeam/BreaQ-2
 
 Each solution folder has its own README with setup, results and limitations. Tested with Python 3.12 and Qiskit 2.6.1 (see each `requirements.txt`).
 
-**AI assistance:** the code and documentation were developed with an AI assistant (Claude) and verified by running them; every number in the READMEs comes from a command in this repository.
+**AI assistance:** the code and documentation were developed with an AI assistant (Claude) and verified by running them; every number in the READMEs comes from a command in this repository. Every prompt given to the assistant during the hackathon is in [`BreaQ_my_prompts_2026-10-25.txt`](BreaQ_my_prompts_2026-10-25.txt).
 
 ---
 
