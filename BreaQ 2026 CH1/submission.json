@@ -1,0 +1,22 @@
+{
+  "team_id": "DEMO-TEAM",
+  "challenge": "01-trust-no-input",
+  "security_claim": "",
+  "root_cause_layer": "",
+  "minimal_reproducer": {},
+  "defense_results": {
+    "implemented": false,
+    "passed": 0,
+    "failed": 0
+  },
+  "attack_demo": {},
+  "claims": [
+    {
+      "claim": "",
+      "evidence": "",
+      "assumption": "",
+      "limitation": ""
+    }
+  ],
+  "team_member_contributions": []
+}

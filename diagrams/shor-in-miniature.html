@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shor in Miniature Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="diagrams.css">
+</head>
+<body>
+<main class="page">
+  <nav class="crumbs"><a href="index.html">All diagrams</a><a href="ch1-trust-no-input.html">Trust No Input</a><a href="quantum-dice.html">Quantum Dice</a><a href="bb84-bob.html">BB84</a></nav>
+
+  <header>
+    <span class="eyebrow">BreaQ 2026 · Quantum Hacking · Shor in Miniature (140 pts)</span>
+    <h1>Shor in Miniature</h1>
+    <p class="lede">The quantum circuit does one job: it finds how often the powers of a number repeat (the period). Ordinary arithmetic turns that period into the factors. Part B scales the same idea up to RSA-2048 and asks how far today's machines are.</p>
+    <dl class="facts">
+      <div><dt>Level 1, N = 21</dt><dd>15 qubits</dd></div>
+      <div><dt>Level 2, N = 21</dt><dd>22 qubits</dd></div>
+      <div><dt>Bonus, 6-bit N</dt><dd>15 qubits (7 with tables)</dd></div>
+      <div><dt>Test suite</dt><dd>all passed, 323 s</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="glance-h">
+    <h2 id="glance-h">The project at a glance</h2>
+    <ol class="pipe">
+      <li class="classical"><span class="tag classical">classical</span><b>Pre-checks</b><span>21 is odd and not a power; pick a = 2; gcd(2, 21) = 1.</span></li>
+      <li class="quantum"><span class="tag quantum">quantum</span><b>Build the circuit</b><span><code>build_shor(21, 2)</code>: 15 qubits, never told the answer.</span></li>
+      <li class="quantum"><span class="tag quantum">quantum</span><b>Run 20 shots</b><span>20 clues y, mostly near multiples of 1024/6.</span></li>
+      <li class="check"><span class="tag check">classical</span><b>Find the period</b><span>Fractions and LCM give r = 6, since 2⁶ mod 21 = 1.</span></li>
+      <li class="out"><span class="tag out">output</span><b>Factors</b><span>x = 2³ mod 21 = 8; gcd(7, 21), gcd(9, 21) give (3, 7).</span></li>
+    </ol>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="judge-h">
+      <h2 id="judge-h">What the judges do</h2>
+      <p>They call <code>build_shor(N, a)</code> and <code>factor(N)</code> on hidden odd composite numbers up to 6 bits, and run two tests per case:</p>
+      <ol>
+        <li><b>Distribution:</b> the TV distance between our 2,000-shot histogram and the ideal one must be below 0.1.</li>
+        <li><b>Factoring:</b> <code>factor(N)</code> returns the right factors in time, using only our circuit.</li>
+      </ol>
+      <p><b>Forbidden ("compiled Shor"):</b> giving the circuit r or the factors, looking N up in a table, or finding r classically inside <code>factor</code>. Precomputing a^(2^j) mod N is allowed.</p>
+    </section>
+    <section class="panel" aria-labelledby="levels-h">
+      <h2 id="levels-h">Three ways to build the multiplier</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Version</th><th>Call</th><th class="num">N = 21</th><th class="num">6-bit N</th></tr></thead>
+          <tbody>
+            <tr><td>Level 1 (40 pts)</td><td><code>build_shor</code>: lookup tables</td><td class="num">15</td><td class="num">18</td></tr>
+            <tr><td>Level 2 (+30)</td><td><code>build_shor_level2</code>: QFT adders</td><td class="num">22</td><td class="num">26</td></tr>
+            <tr><td>Bonus</td><td><code>build_shor_semiclassical</code>: 1 recycled qubit</td><td class="num">13</td><td class="num">15</td></tr>
+            <tr><td>Bonus, tables</td><td>same, <code>gates=False</code></td><td class="num">6</td><td class="num">7</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Qubit counts. Tie-breaker: fewer qubits on the hidden 6-bit case.</p>
+    </section>
+  </div>
+
+  <section aria-labelledby="run-h">
+    <h2 id="run-h">1 · One real run of factor(21), end to end</h2>
+    <p class="section-intro">Every value on the right is from an actual run (the random pick happened to be a = 2). Left: what goes in, what it does, what comes out, and why. Right: the code from <code>shor.py</code> and its real output.</p>
+    <ul class="legend">
+      <li><span class="tag classical">classical</span> ordinary Python</li>
+      <li><span class="tag quantum">quantum</span> the circuit</li>
+      <li><span class="tag check">check</span> a decision</li>
+      <li><span class="tag out">output</span> the answer</li>
+    </ul>
+    <ol class="flow">
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Pre-checks and a random a</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>N = 21, given by the judges</dd>
+            <dt>DO</dt><dd>Is it even? Is it a perfect power like 5² or 3³? Pick a random a from 2 to 19, then compute gcd(a, 21).</dd>
+            <dt>OUT</dt><dd>a = 2, and gcd = 1, so we need the circuit</dd>
+          </dl>
+          <p class="why"><b>Why:</b> an even N or a power has an easy classical answer (the quantum trick can't work on powers). A random a avoids a lookup table, which is forbidden. If a shared a factor with N, the gcd would already be the answer.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">if N % 2 == 0:
+    return done(2)
+b = perfect_power(N)
+if b:
+    return done(b)
+a = rng.randrange(2, N - 1)
+g = math.gcd(a, N)
+if g &gt; 1:
+    return done(g)</pre>
+          <p>21 odd · not a power · a = <b>2</b> · gcd(2, 21) = <b>1</b><br>9, 25, 27, 49 are powers: answered without a circuit</p>
+        </div>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Build the circuit: <code>build_shor(21, 2)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>only N = 21 and a = 2; the period r is never given</dd>
+            <dt>DO</dt><dd>10 counting qubits try every x from 0 to 1023 at once; 5 work qubits compute 2ˣ mod 21 for all of them; an inverse QFT turns the repeat into peaks; measure the counting qubits.</dd>
+            <dt>OUT</dt><dd>a 15-qubit circuit, not run yet (section 2 opens it up)</dd>
+          </dl>
+          <p class="why"><b>Why:</b> 2ˣ mod 21 repeats every 6 steps (1, 2, 4, 8, 16, 11, 1, …). The circuit hides that 6 in the counting qubits, where the inverse QFT can turn it into readable peaks.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">n = N.bit_length()        # 5
+t = 2 * n                 # 10
+qc.x(work[0])             # calculator = 1
+qc.h(cnt)                 # all x at once
+consts = mult_constants(N, a, t)
+for q in range(t):
+    qc.append(_ctrl_perm_gate(N, n, consts[t - 1 - q]),
+              [cnt[q]] + list(work))
+qc.compose(iqft_circuit(t), qubits=list(cnt), inplace=True)
+qc.measure(cnt, c)</pre>
+          <p><b>15</b> qubits · 1 X · 20 H · 10 controlled multiplications · 45 controlled phases · 10 measurements</p>
+        </div>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Run 20 shots: <code>run_shots(qc, 20, seed)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>the circuit and a seed</dd>
+            <dt>DO</dt><dd>The Aer simulator runs it 20 times, keeps every result separately, and turns each 10-bit string into a number y.</dd>
+            <dt>OUT</dt><dd>20 clues y</dd>
+          </dl>
+          <p class="why"><b>Why:</b> one run gives one random clue, and one clue often gives only part of r, so we collect several. Most clues sit at the peaks; a few (352, 837) land in the small tails, because 1024/6 is not a whole number.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">sim = AerSimulator(method="statevector",
+                   seed_simulator=seed)
+res = sim.run(qc, shots=shots, memory=True).result()
+return [int(m.replace(" ", ""), 2)
+        for m in res.get_memory()]</pre>
+          <p>[512, 0, 854, 0, 171, 0, <span class="hit">352</span>, 512, 853, 0, 0, 171, 683, 0, 682, <span class="hit">837</span>, 680, 512, 512, 853]</p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Clues to fractions (continued fractions)</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>the 20 clues</dd>
+            <dt>DO</dt><dd>Divide each clue by 1024 and find the closest simple fraction whose bottom number is below 21.</dd>
+            <dt>OUT</dt><dd>20 bottom numbers (denominators)</dd>
+          </dl>
+          <p class="why"><b>Why:</b> y/1024 ≈ s/r, so each clue is a fraction in disguise, and its bottom number is r or a piece of r (3/6 simplifies to 1/2). The limit "below 21" stops huge, wrong bottom numbers.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">dens = [Fraction(y, 2 ** t)
+        .limit_denominator(N - 1).denominator
+        for y in ys]</pre>
+          <p>854 → 5/6 · 512 → 1/2 · 171 → 1/6 · 683 → 2/3 · 0 → 0 · 352 → 7/20 · 837 → 9/11<br>[2, 1, 6, 1, 6, 1, 20, 2, 6, 1, 1, 6, 3, 1, 3, 11, 3, 2, 2, 6]</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Bottom numbers to the period r</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>the bottom numbers, in shot order</dd>
+            <dt>DO</dt><dd>Combine them with the least common multiple (LCM) until 2ʳ mod 21 = 1. Then try to shrink r (would 3 or 2 also work?), and check that r explains at least half of all clues.</dd>
+            <dt>OUT</dt><dd>r = 6, found at shot 3</dd>
+          </dl>
+          <p class="why"><b>Why:</b> the LCM glues pieces such as 2 and 3 into 6. 2ʳ mod 21 = 1 is what "period" means. The half-of-the-clues check is the anti-cheat: random numbers could pass the first test, but they don't explain most clues.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">for d in dens:
+    r = r * d // math.gcd(r, d)        # LCM
+    if r &gt; 1 and pow(a, r, N) == 1:
+        r = _strip(a, r, N)
+        return r if sum(r % d == 0 for d in dens) \
+                    &gt;= SUPPORT * len(dens) else None</pre>
+          <p>shot 1: d = 2 → r = 2 → 2² mod 21 = 4<br>shot 2: d = 1 → r = 2 → still 4<br>shot 3: d = 6 → r = 6 → 2⁶ mod 21 = <b>1</b> ✓<br>shrink: 2³ = 8, 2² = 4, so r stays 6<br>explains <b>18 / 20</b> clues (needs 10)</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Is r useful?</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>r = 6</dd>
+            <dt>DO</dt><dd>Check that r is even, compute x = 2^(6/2) mod 21, and check that x is not 20 (−1 mod 21).</dd>
+            <dt>OUT</dt><dd>x = 8</dd>
+          </dl>
+          <p class="why"><b>Why:</b> x² = 2⁶ leaves remainder 1, so (x − 1)(x + 1) is a multiple of 21 and the factors hide in x − 1 and x + 1. An odd r can't be halved (a = 4 gives r = 3), and x = −1 gives only 1 and 21 (a = 5).</p>
+          <span class="branch">otherwise: retry with a new a</span>
+        </div>
+        <div class="note code-note">
+<pre class="code">if r is None or r % 2:
+    continue
+x = pow(a, r // 2, N)
+if x == N - 1:
+    continue</pre>
+          <p>6 is even ✓ · x = 2³ mod 21 = <b>8</b> · 8 ≠ 20 ✓</p>
+        </div>
+      </li>
+      <li class="stage out">
+        <div class="card">
+          <div class="card-head"><span class="tag out">output</span><h3>The factors</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>x = 8</dd>
+            <dt>DO</dt><dd>gcd(8 − 1, 21) and gcd(8 + 1, 21); keep a result strictly between 1 and 21.</dd>
+            <dt>OUT</dt><dd><code>factor(21) = (3, 7)</code></dd>
+          </dl>
+          <p class="why"><b>Why:</b> 7 × 9 = 63 = 3 × 21, so 21's factors are split between 7 and 9, and the gcd pulls out the shared part.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">for p in (math.gcd(x - 1, N), math.gcd(x + 1, N)):
+    if 1 &lt; p &lt; N:
+        return done(p)</pre>
+          <p>gcd(7, 21) = <b>7</b> · gcd(9, 21) = <b>3</b><br>3 × 7 = 21 ✓, smaller number first</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="inside-h">
+    <h2 id="inside-h">2 · Inside build_shor(21, 2)</h2>
+    <p class="section-intro">The circuit, action by action. The work register is the "calculator"; the counting register holds every x and, at the end, the clue y.</p>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Code</th><th>What it does</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td><code>int(N), int(a)</code>, <code>_check</code></td><td>Plain numbers; gcd(a, N) must be 1</td><td>Judges may pass numpy ints; without gcd 1 there is no period</td></tr>
+          <tr><td class="num">2</td><td><code>n = 5</code>, <code>t = 10</code></td><td>Work: 5 qubits; counting: 10</td><td>5 bits hold up to 31; 2¹⁰ = 1,024 ≥ 21² = 441 gives a sharp reading</td></tr>
+          <tr><td class="num">3</td><td><code>qc.x(work[0])</code></td><td>Calculator = 1</td><td>We multiply again and again; 0 would stay 0</td></tr>
+          <tr><td class="num">4</td><td><code>qc.h(cnt)</code></td><td>All x from 0 to 1023 at once</td><td>Computes 2ˣ for every x in one go</td></tr>
+          <tr><td class="num">5</td><td><code>mult_constants</code></td><td>2, 4, 16, 4, 16, 4, 16, 4, 16, 4</td><td>x is binary, so 2ˣ = 2^(1·bit₀) · 2^(2·bit₁) · …: one multiplier per counting qubit</td></tr>
+          <tr><td class="num">6</td><td>10 × <code>_ctrl_perm_gate</code></td><td>Counting qubit q: "if I'm 1, multiply the calculator by my number"</td><td>Together they compute 2ˣ mod 21 for every x; the calculator can only show 1, 2, 4, 8, 16, 11</td></tr>
+          <tr><td class="num">7</td><td><code>iqft_circuit(10)</code></td><td>Inverse QFT on the counting qubits</td><td>Like an FFT, it turns "repeats every 6" into peaks at multiples of 1024/6</td></tr>
+          <tr><td class="num">8</td><td><code>qc.measure(cnt, c)</code></td><td>Read the counting qubits into 10 bits</td><td>The only way to get the clue out; the calculator isn't needed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Wiring: which qubit multiplies by what</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>counting qubit</th><th class="num">0</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th><th class="num">5</th><th class="num">6</th><th class="num">7</th><th class="num">8</th><th class="num">9</th></tr></thead>
+            <tbody><tr><td>multiply by</td><td class="num">4</td><td class="num">16</td><td class="num">4</td><td class="num">16</td><td class="num">4</td><td class="num">16</td><td class="num">4</td><td class="num">16</td><td class="num">4</td><td class="num">2</td></tr></tbody>
+          </table>
+        </div>
+        <p>Reversed on purpose: qubit 0 gets the largest power. That is the QFT's swap layer moved into the wiring, so the measured key read as a binary number is y directly. The textbook order with Qiskit's own inverse QFT gives exactly the same distribution, plus 5 swap gates.</p>
+      </div>
+      <div class="panel">
+        <h3>What the registers hold after each step</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>After</th><th>Counting register</th><th>Work register</th></tr></thead>
+            <tbody>
+              <tr><td>X</td><td>0</td><td>1</td></tr>
+              <tr><td>H</td><td>every x, 0–1023</td><td>1</td></tr>
+              <tr><td>multiplications</td><td>every x</td><td>2ˣ mod 21: 1, 2, 4, 8, 16, 11 (1/6 each)</td></tr>
+              <tr><td>inverse QFT</td><td>peaks at 0, 171, 341, 512, 683, 853</td><td>not used</td></tr>
+              <tr><td>measure</td><td>one clue y</td><td>never measured</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The lookup table for "× 2 mod 21": 1→2, 2→4, …, 10→20, 11→1, 12→3, …. It is reversible because no two inputs give the same output.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="dist-h">
+    <h2 id="dist-h">What the circuit should output for N = 21, a = 2</h2>
+    <p class="section-intro">The ideal chance of each clue y. 0 and 512 are exact multiples of 1024/6 (16.7% each); the other peaks are 11.4% each, with 2.85% on a neighbour. The judges compare a 2,000-shot histogram against this.</p>
+    <div class="panel chart">
+      <svg viewBox="0 0 1100 260" role="img" aria-label="Ideal distribution of the measured value y for N = 21, a = 2: peaks at 0, 171, 341, 512, 683 and 853">
+        <line class="axis" x1="60" y1="162.8" x2="1060" y2="162.8" stroke-dasharray="3 5"/>
+        <text x="52" y="166.8" text-anchor="end">0.05</text>
+        <line class="axis" x1="60" y1="115.6" x2="1060" y2="115.6" stroke-dasharray="3 5"/>
+        <text x="52" y="119.6" text-anchor="end">0.10</text>
+        <line class="axis" x1="60" y1="68.3" x2="1060" y2="68.3" stroke-dasharray="3 5"/>
+        <text x="52" y="72.3" text-anchor="end">0.15</text>
+        <line class="axis" x1="60" y1="210" x2="1060" y2="210"/>
+        <rect class="peak" x="58.0" y="52.6" width="4" height="157.4"/>
+        <rect class="peak" x="224.0" y="183.1" width="4" height="26.9"/>
+        <rect class="peak" x="225.0" y="102.3" width="4" height="107.7"/>
+        <rect class="peak" x="391.0" y="102.3" width="4" height="107.7"/>
+        <rect class="peak" x="392.0" y="183.1" width="4" height="26.9"/>
+        <rect class="peak" x="558.0" y="52.6" width="4" height="157.4"/>
+        <rect class="peak" x="724.0" y="183.1" width="4" height="26.9"/>
+        <rect class="peak" x="725.0" y="102.3" width="4" height="107.7"/>
+        <rect class="peak" x="726.0" y="203.3" width="4" height="6.7"/>
+        <rect class="peak" x="890.0" y="203.3" width="4" height="6.7"/>
+        <rect class="peak" x="891.0" y="102.3" width="4" height="107.7"/>
+        <rect class="peak" x="892.0" y="183.1" width="4" height="26.9"/>
+        <text class="peak-label" x="60.0" y="44.6" text-anchor="middle">0</text>
+        <text class="peak-label" x="227.0" y="94.3" text-anchor="middle">171</text>
+        <text class="peak-label" x="393.0" y="94.3" text-anchor="middle">341</text>
+        <text class="peak-label" x="560.0" y="44.6" text-anchor="middle">512</text>
+        <text class="peak-label" x="727.0" y="94.3" text-anchor="middle">683</text>
+        <text class="peak-label" x="893.0" y="94.3" text-anchor="middle">853</text>
+        <text x="60.0" y="230" text-anchor="middle">0</text>
+        <text x="310.0" y="230" text-anchor="middle">256</text>
+        <text x="560.0" y="230" text-anchor="middle">512</text>
+        <text x="810.0" y="230" text-anchor="middle">768</text>
+        <text x="1060.0" y="230" text-anchor="middle">1024</text>
+        <text x="560" y="254" text-anchor="middle">measured value y (10-bit counting register, 0 to 1023)</text>
+        <text x="14" y="44">P(y)</text>
+      </svg>
+    </div>
+  </section>
+
+  <section aria-labelledby="why-h">
+    <h2 id="why-h">3 · Why each choice</h2>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Why 2n counting qubits</h3>
+        <p>With 2¹⁰ = 1,024 positions for numbers below 21, two different fractions s/r can't land on the same clue, so continued fractions return the right bottom number. With fewer qubits they can return the wrong one; the brief gives this as a hint.</p>
+      </div>
+      <div class="panel">
+        <h3>Why combine several clues</h3>
+        <p>A clue like 512 → 1/2 gives only 2, and 683 → 2/3 gives only 3, because the fraction simplified. The LCM of the pieces gives the full period, 6.</p>
+      </div>
+      <div class="panel">
+        <h3>Why the "half of the clues" check stays</h3>
+        <p>Turned off, <code>factor</code> "factored" pure random numbers in 70 of 70 runs, with no circuit at all, because the LCM of many random bottom numbers eventually contains the period. With it on: 0 of 100. It keeps the brief's rule that factoring uses only our circuit.</p>
+      </div>
+      <div class="panel">
+        <h3>Why some clues are off-peak</h3>
+        <p>1024/6 = 170.67 is not a whole number, so each peak leaks a little onto nearby values. Clues like 352 → 7/20 don't fit; the check sees 18 of 20 fit, which is fine.</p>
+      </div>
+      <div class="panel">
+        <h3>Why it sometimes retries</h3>
+        <p>Shor's trick fails for some a, for classical reasons: an odd period (a = 4 gives r = 3) or x = −1 (a = 5: 5³ mod 21 = 20). <code>factor</code> simply picks a new random a.</p>
+      </div>
+      <div class="panel">
+        <h3>Why the judges also test the histogram</h3>
+        <p>The final gcd step can turn even random numbers into factors now and then, so checking only the answer isn't enough. A TV below 0.1 shows the circuit itself is right. Our Level 1 matches the ideal exactly (TV ≤ 2.3 × 10⁻¹³ on the statevector).</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="simple-h">
+    <h2 id="simple-h">4 · What we simplified</h2>
+    <p class="section-intro">The code is the design the brief prescribes. After cleanup, <code>shor.py</code> went from 321 to 300 lines and the full test suite still passes.</p>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Removed</h3>
+        <ul>
+          <li><code>transpile</code> before running: the simulator understands all our gates, and the shots were identical without it.</li>
+          <li>The <code>build_shor(level=…)</code> switch: call <code>build_shor_level2</code> or <code>build_shor_semiclassical</code> directly.</li>
+          <li>4 alternative function names that guessed at the judges' harness.</li>
+          <li><code>prime_factors</code>: not in the brief; <code>factor</code> returns one split (p, q).</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Kept, because each one protects points</h3>
+        <ul>
+          <li>Level 1, Level 2 and both bonus variants (levels and the qubit tie-breaker).</li>
+          <li>Perfect-power and gcd checks (the brief's common mistakes).</li>
+          <li>Shrinking r (an off-peak clue can make the LCM too big).</li>
+          <li>The half-of-the-clues check (otherwise random numbers "factor").</li>
+          <li><code>noise_table.py</code>: evidence that even a perfect circuit can fail TV &lt; 0.1 by chance.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Test results (final run)</h3>
+        <ul>
+          <li>Level 1: every 4-, 5- and 6-bit odd composite and every a: the exact distribution equals the ideal.</li>
+          <li>2,000 shots: TV &lt; 0.1 in 63 of 64 cases; N = 27, a = 23 gives 0.1008 from shot noise alone.</li>
+          <li>Level 2: (15, 7) TV 0.012, (21, 2) TV 0.045 at 2,000 shots.</li>
+          <li><code>factor(N)</code> is correct for every odd composite up to 63; random numbers succeed 0 of 100 times.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>The noise risk to raise with a mentor</h3>
+        <p>A perfect circuit can still fail the judges' TV test by chance when the period is long: up to 8.7% of runs for N = 25, up to 4% for N = 27, and every run for N = 49 with r = 42. That is shot noise, not a bug, and it affects every team.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="b-h">
+    <h2 id="b-h">5 · Part B: how far is RSA-2048?</h2>
+    <p class="section-intro">The question: how many good physical qubits would a real attack need, and how far are today's machines? Our own arithmetic uses the brief's toy surface-code model.</p>
+    <ol class="flow">
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">assume</span><h3>Physical error rate p = 0.1%</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>p = 0.001 per gate, threshold 1%</dd>
+            <dt>DO</dt><dd>Error correction groups many physical qubits into one logical qubit; a larger code distance d lowers its error.</dd>
+            <dt>OUT</dt><dd>the logical error per qubit per cycle, p_L</dd>
+          </dl>
+          <p class="why"><b>Why:</b> today's qubits fail far too often for a days-long computation, so they must be protected.</p>
+        </div>
+        <p class="note">p_L = 0.1 · (100p)^((d+1)/2)</p>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">workload</span><h3>1,500 logical qubits for 5 days</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>the judges' worked example, at a 1 µs cycle</dd>
+            <dt>DO</dt><dd>Count error-correction cycles.</dd>
+            <dt>OUT</dt><dd>T cycles</dd>
+          </dl>
+        </div>
+        <p class="note">T = 5 · 86,400 s / 1 µs<br>= <b>4.32 × 10¹¹</b> cycles</p>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Need L · T · p_L &lt; 0.1</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>L = 1,500, T = 4.32 × 10¹¹</dd>
+            <dt>DO</dt><dd>Find the smallest odd d whose total failure chance is below 10%.</dd>
+            <dt>OUT</dt><dd>d = 29</dd>
+          </dl>
+          <p class="why"><b>Why:</b> less than a 10% chance that any logical qubit fails during the whole run.</p>
+        </div>
+        <p class="note">p_L &lt; 1.54 × 10⁻¹⁶<br>smallest odd d = <b>29</b></p>
+      </li>
+      <li class="stage out">
+        <div class="card">
+          <div class="card-head"><span class="tag out">result</span><h3>About 2.52 million physical qubits</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>d = 29, L = 1,500</dd>
+            <dt>DO</dt><dd>2d² physical qubits per logical qubit, times L.</dd>
+            <dt>OUT</dt><dd>2,523,000, before magic-state factories</dd>
+          </dl>
+          <p class="why"><b>Why:</b> lands in the 10⁶–10⁷ range the brief expects; Gidney's tricks bring the real figure under one million.</p>
+        </div>
+        <p class="note">1,500 × 1,682 = 2,523,000</p>
+      </li>
+    </ol>
+    <div class="grid-2">
+      <div class="panel table-wrap">
+        <table>
+          <thead><tr><th class="num">d</th><th class="num">p_L</th><th class="num">L · T · p_L</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td class="num">23</td><td class="num">1e-13</td><td class="num">64.8</td><td>too large</td></tr>
+            <tr><td class="num">25</td><td class="num">1e-14</td><td class="num">6.48</td><td>too large</td></tr>
+            <tr><td class="num">27</td><td class="num">1e-15</td><td class="num">0.648</td><td>too large</td></tr>
+            <tr class="pass"><td class="num">29</td><td class="num">1e-16</td><td class="num">0.0648</td><td>below 0.1</td></tr>
+            <tr><td class="num">31</td><td class="num">1e-17</td><td class="num">0.00648</td><td>below 0.1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel table-wrap">
+        <table>
+          <thead><tr><th>Estimate</th><th class="num">Physical qubits</th><th>Runtime</th></tr></thead>
+          <tbody>
+            <tr><td>Gidney-Ekerå 2019</td><td class="num">20,000,000</td><td>7.4 hours</td></tr>
+            <tr><td>Gidney 2025</td><td class="num">897,864</td><td>4.96 days</td></tr>
+            <tr><td>Pinnacle 2026 (QLDPC)</td><td class="num">94,000–381,000</td><td>1 month to 1 day</td></tr>
+            <tr><td>Our toy model</td><td class="num">2,523,000</td><td>5 days</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>The gap today</h3>
+        <ul>
+          <li>Helios: 98 qubits with two-qubit error 7.9 × 10⁻⁴, already better than the assumed 10⁻³. Gap to Gidney 2025: <b>9,162×</b> in qubits.</li>
+          <li>The largest verified array has 6,100 atomic qubits, still 147× short, and without gate errors shown at that scale.</li>
+          <li>The 20× drop from 2019 to 2025 came from algorithms (yoked surface codes, magic state cultivation, approximate residue arithmetic), largely by trading qubits for runtime.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Timeline and consequence</h3>
+        <ul>
+          <li>Depending on how fast hardware and algorithms improve, the crossing lands between 2033 and 2065.</li>
+          <li>Mosca's rule: if secrecy time plus migration time exceeds the time to a machine, you are already late.</li>
+          <li>Recorded traffic can be decrypted later, so key exchange should move to ML-KEM now.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="words-h">
+    <h2 id="words-h">6 · Words you need</h2>
+    <dl class="glossary">
+      <div><dt>Factor</dt><dd>A number that divides N exactly: 3 and 7 for 21.</dd></div>
+      <div><dt>gcd</dt><dd>Greatest common divisor: the biggest number dividing both. gcd(9, 21) = 3.</dd></div>
+      <div><dt>Coprime</dt><dd>gcd = 1: the two numbers share no factor.</dd></div>
+      <div><dt>mod</dt><dd>The remainder after dividing: 64 mod 21 = 1.</dd></div>
+      <div><dt>Period (order) r</dt><dd>How many multiplications by a bring you back to 1: 6 for a = 2, N = 21.</dd></div>
+      <div><dt>Counting register</dt><dd>The 2n qubits that hold every x, and at the end the clue y.</dd></div>
+      <div><dt>Work register</dt><dd>The n qubits acting as a calculator for aˣ mod N.</dd></div>
+      <div><dt>Superposition</dt><dd>A qubit holding a mix of 0 and 1; 10 of them hold all 1,024 values of x at once.</dd></div>
+      <div><dt>Controlled gate</dt><dd>A gate that acts only when its control qubit is 1.</dd></div>
+      <div><dt>Permutation matrix</dt><dd>A 0/1 lookup table written as a matrix; it can be run backwards.</dd></div>
+      <div><dt>Inverse QFT</dt><dd>Turns a repeating pattern into peaks, like an FFT finds a rhythm.</dd></div>
+      <div><dt>Shot</dt><dd>One run of the circuit, giving one measured number y.</dd></div>
+      <div><dt>Continued fractions</dt><dd>Finds the simplest fraction close to a decimal: 0.834 → 5/6.</dd></div>
+      <div><dt>LCM</dt><dd>Least common multiple: the smallest number both divide. LCM(2, 3) = 6.</dd></div>
+      <div><dt>TV distance</dt><dd>½ Σ |P_ours(y) − P_ideal(y)|: 0 means identical, 1 means nothing in common.</dd></div>
+      <div><dt>Compiled Shor</dt><dd>A circuit built using the answer. Forbidden: it voids Part A.</dd></div>
+      <div><dt>Logical qubit, code distance d</dt><dd>Many physical qubits protecting one reliable qubit; a larger d means fewer errors and more qubits.</dd></div>
+    </dl>
+  </section>
+
+  <section class="panel" aria-labelledby="predict-h">
+    <h2 id="predict-h">7 · Predict a new case</h2>
+    <p>The judges may change one thing and ask what happens. Our answers, each checked by running the code:</p>
+    <ul class="qa">
+      <li><span class="ask">N = 15, a = 7?</span><span class="ans">4 bits, so 8 counting qubits and 12 in total. r = 4, peaks at 0, 64, 128, 192. x = 7² mod 15 = 4; gcd(3, 15) = 3 and gcd(5, 15) = 5, so (3, 5).</span></li>
+      <li><span class="ask">a = 4 for N = 21?</span><span class="ans">4, 16, 1: r = 3 is odd, so <code>factor</code> retries with another a.</span></li>
+      <li><span class="ask">a = 5 for N = 21?</span><span class="ans">r = 6, but 5³ mod 21 = 20 = −1, so only 1 and 21 come out: retry.</span></li>
+      <li><span class="ask">N = 25?</span><span class="ans">A perfect power (5²): answered classically as (5, 5), no circuit. The quantum reduction can't work for powers of a prime.</span></li>
+      <li><span class="ask">Read the counting bits in reverse order?</span><span class="ans">TV 0.542 for (21, 2): the judges' test fails. It's one of our negative controls.</span></li>
+      <li><span class="ask">Forget to set the calculator to 1?</span><span class="ans">TV 0.833 for (21, 2): it stays 0, so there is no pattern to find.</span></li>
+      <li><span class="ask">Feed random numbers instead of the circuit's output?</span><span class="ans"><code>factor</code> succeeds 0 of 100 times, thanks to the half-of-the-clues check.</span></li>
+    </ul>
+  </section>
+
+  <section class="panel" aria-labelledby="jury-h">
+    <h2 id="jury-h">Say it to the jury</h2>
+    <ol class="jury">
+      <li><q>Our circuit never sees the period: it is built from N and a only, and factor() fails when you feed it random numbers instead of the circuit's output.</q></li>
+      <li><q>The quantum part finds the period; continued fractions and a gcd turn the period into factors.</q></li>
+      <li><q>What a control test showed us: with the half-of-the-clues check switched off, factor() "factored" pure random numbers 70 times out of 70, so we keep that check.</q></li>
+      <li><q>RSA-2048 needs about a million noisy qubits by the best estimate; today's best machines are thousands of times smaller, but the requirement keeps falling.</q></li>
+    </ol>
+  </section>
+
+  <footer>Local simulation with Qiskit and Qiskit Aer. Numbers come from <code>shor_in_miniature/test_shor.py</code> (final run, 323 s), a traced run of <code>factor(21)</code>, <code>results/</code> and <code>part_b.py</code>; citations are listed in <code>PART_B.md</code>.</footer>
+</main>
+</body>
+</html>

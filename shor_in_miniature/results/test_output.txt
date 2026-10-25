@@ -1,0 +1,49 @@
+[     0s] G ok: builders reach only ['_check', '_ctrl_perm_gate', 'build_shor', 'build_shor_level2', 'build_shor_semiclassical', 'cmult_circ', 'cu_circ', 'iqft_circuit', 'mult_constants', 'phi_add', 'phi_add_mod', 'qft_circuit']; no order/period names, no while loops, interface (N, a)
+[     0s] G ok: Level 1 circuit shape is identical for all 5-bit (N, a), orders 1..20
+[     0s] A ok: qft_circuit is the DFT with output bit reversal (equals Qiskit QFTGate up to its swap layer)
+[    16s] B1 ok: phi_add == classical (b +- c) mod 2^5, 15680 inputs, 0/1/2 controls
+[    18s] B2 ok: phi_add_mod == classical (a+b) mod 15, 900 inputs, ancilla clean
+[    25s] B2 ok: phi_add_mod == classical (a+b) mod 21, 1764 inputs, ancilla clean
+[    34s] B3 ok: N=15: CMULT 960 inputs, controlled-U_a 240 inputs (8 values of a), work/accumulator/ancilla clean
+[    41s] B3 ok: N=9: CMULT 972 inputs, controlled-U_a 108 inputs (6 values of a), work/accumulator/ancilla clean
+[    71s] B3 ok: N=21: CMULT 1512 inputs, controlled-U_a 504 inputs (12 values of a), work/accumulator/ancilla clean
+[    71s] C0 ok: FFT ideal distribution == literal textbook sum; (15,7) has four peaks of 0.25 at y = 0, 64, 128, 192
+[    72s] F ok: uniform random 20-shot batches accepted as an order: 6/6560 = 0.0009 (the circuit's batches: 1.000)
+[    72s] F ok: order_from_shots never returns a wrong order; found it in 6560/6560 = 1.000 of 20-shot batches (all N <= 63, all coprime a >= 2)
+[    72s] F ok: continued fractions + LCM on hand-picked shots
+[    72s] C ok: all 4-bit odd composites [9, 15]: circuit statevector == ideal (max TV so far 1.3e-14)
+[    74s] C ok: all 5-bit odd composites [21, 25, 27]: circuit statevector == ideal (max TV so far 5.7e-14)
+[   153s] C ok: all 6-bit odd composites [33, 35, 39, 45, 49, 51, 55, 57, 63]: circuit statevector == ideal (max TV so far 2.3e-13)
+[   153s] C: 64 (N,a) cases with 2000 shots, worst shot TV 0.101; cases with TV >= 0.1: [(27, 23, 18, 0.10077223703788064)]
+[   153s] C noise floor, perfect circuit, 2000 shots: N=15 a=7 r=4: mean TV 0.016, p99 0.032, P(TV >= 0.1) = 0.000
+[   153s] C noise floor, perfect circuit, 2000 shots: N=21 a=2 r=6: mean TV 0.051, p99 0.069, P(TV >= 0.1) = 0.000
+[   153s] C noise floor, perfect circuit, 2000 shots: N=25 a=2 r=20: mean TV 0.089, p99 0.104, P(TV >= 0.1) = 0.052
+[   153s] C noise floor, perfect circuit, 2000 shots: N=27 a=2 r=18: mean TV 0.085, p99 0.102, P(TV >= 0.1) = 0.022
+[   153s] C noise floor, perfect circuit, 2000 shots: N=35 a=2 r=12: mean TV 0.070, p99 0.086, P(TV >= 0.1) = 0.000
+[   153s] C noise floor, perfect circuit, 2000 shots: N=49 a=3 r=42: mean TV 0.123, p99 0.135, P(TV >= 0.1) = 1.000
+[   153s] C noise floor, perfect circuit, 2000 shots: N=63 a=2 r=6: mean TV 0.051, p99 0.068, P(TV >= 0.1) = 0.000
+[   153s] C negative controls N=15 a=7: correct TV 0.013; reversed bit order TV 0.755; work register not set to 1 TV 0.750
+[   153s] C negative controls N=21 a=2: correct TV 0.063; reversed bit order TV 0.542; work register not set to 1 TV 0.833
+[   156s] D ok: Level 2 N=15 a=7: 18 qubits, exact TV 4.6e-15, 2000-shot TV 0.012
+[   212s] D ok: Level 2 N=21 a=2: 22 qubits, exact TV 5.6e-14, 2000-shot TV 0.045
+[   214s] D ok: Level 2 N=15 a=1: 18 qubits, exact TV 4.8e-15, 2000-shot TV 0.000
+[   217s] D ok: Level 2 N=15 a=2: 18 qubits, exact TV 5.0e-15, 2000-shot TV 0.013
+[   219s] D ok: Level 2 N=15 a=4: 18 qubits, exact TV 4.9e-15, 2000-shot TV 0.001
+[   222s] D ok: Level 2 N=15 a=8: 18 qubits, exact TV 4.9e-15, 2000-shot TV 0.019
+[   224s] D ok: Level 2 N=15 a=11: 18 qubits, exact TV 4.9e-15, 2000-shot TV 0.009
+[   227s] D ok: Level 2 N=15 a=13: 18 qubits, exact TV 4.6e-15, 2000-shot TV 0.012
+[   229s] D ok: Level 2 N=15 a=14: 18 qubits, exact TV 4.6e-15, 2000-shot TV 0.013
+[   231s] D ok: Level 2 N=9 a=2: 18 qubits, exact TV 1.5e-14, 2000-shot TV 0.046
+[   234s] D ok: Level 2 N=9 a=8: 18 qubits, exact TV 5.4e-15, 2000-shot TV 0.002
+[   234s] E ok: semiclassical N=15 a=7 gates=False: 5 qubits, 2000-shot TV 0.015
+[   234s] E ok: semiclassical N=21 a=2 gates=False: 6 qubits, 2000-shot TV 0.046
+[   235s] E ok: semiclassical N=63 a=2 gates=False: 7 qubits, 2000-shot TV 0.051
+[   235s] E ok: semiclassical N=35 a=2 gates=False: 7 qubits, 2000-shot TV 0.063
+[   242s] E ok: semiclassical N=15 a=7 gates=True: 11 qubits, 2000-shot TV 0.015
+[   286s] E ok: semiclassical N=21 a=2 gates=True: 13 qubits, 2000-shot TV 0.046
+[   287s] F ok: factor(N) correct for every odd composite N <= 63 (Level 1), 5 order-finding circuits run, 1.3s
+[   290s] F ok: quantum path forced (only coprime a): 10 non-prime-power N <= 63 factored, 19 circuits in total, 3.1s
+[   294s] F ok: uniform random samples instead of circuit output: factor() succeeded 0/100 times (must be 0)
+[   294s] F ok: with coprime a forced, factor() fails when the circuit samples are all zeros or uniform random
+[   323s] F ok: Level 2 factor(15) and factor(21) correct (30s)
+[   323s] ALL TESTS PASSED

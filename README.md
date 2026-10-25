@@ -1,3 +1,22 @@
+# BreaQ 2026 Quantum Hacking Track: our solutions
+
+This repository is a copy of the official challenge repository ([RoQTeam/BreaQ-2026-challenges](https://github.com/RoQTeam/BreaQ-2026-challenges), Apache 2.0) with our solutions added. The original README follows below.
+
+| Challenge | Where | Run | Result |
+|---|---|---|---|
+| Trust No Input (CH1) | `BreaQ 2026 CH1/01_trust_no_input.ipynb`, `submission.json` | open the notebook | completed notebook and exported submission |
+| The Treacherous Transpiler (CH2) | `BreaQ 2026 CH2/02_treacherous_transpiler_completed.ipynb`, `guide/` | open the notebook | completed notebook |
+| Quantum Dice: Random or Rigged? | `quantum_dice_simple/` (submitted version), `quantum_dice/` (earlier, larger version) | `python dice.py` | the replay check caught all 20 faulty services (980 / 1,000 batches) with 0 / 1,000 false alarms |
+| Shor in Miniature | `shor_in_miniature/` | `python test_shor.py` | `factor(N)` correct for every odd composite N up to 63; Level 1, Level 2 and bonus circuits; Part B in `PART_B.md` and `PART_B.pdf` |
+| Catch the Eavesdropper (BB84, Bob's side) | `bb84_bob/` | `python bob.py --qber 0.03 --eve 0.01 --seed 1` | a 42,856-bit key from 200,000 qubits, against a local simulated Alice |
+| Explanations | `diagrams/` | open `diagrams/index.html` | one explained page per challenge |
+
+Each solution folder has its own README with setup, results and limitations. Tested with Python 3.12 and Qiskit 2.6.1 (see each `requirements.txt`).
+
+**AI assistance:** the code and documentation were developed with an AI assistant (Claude) and verified by running them; every number in the READMEs comes from a command in this repository.
+
+---
+
 # BreaQ 2026 — Quantum Hacking Track
 
 **Explore. Question. Experiment.**

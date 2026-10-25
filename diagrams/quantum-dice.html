@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quantum Dice Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="diagrams.css">
+</head>
+<body>
+<main class="page">
+  <nav class="crumbs"><a href="index.html">All diagrams</a><a href="ch1-trust-no-input.html">Trust No Input</a><a href="shor-in-miniature.html">Shor in Miniature</a><a href="bb84-bob.html">BB84</a></nav>
+
+  <header>
+    <span class="eyebrow">BreaQ 2026 · Quantum Hacking · Quantum Dice (50 pts) · minimal version</span>
+    <h1>Quantum Dice: Random or Rigged?</h1>
+    <p class="lede">The startup claims its bits are fair and safe because they come from a quantum circuit. We put one classical bug into the service: it re-seeds on every request, so it hands out the same 1,024 bits every time. A balanced histogram cannot see this; a replay check can.</p>
+    <dl class="facts">
+      <div><dt>Direction</dt><dd>the repeated batch</dd></div>
+      <div><dt>Code</dt><dd>dice.py, 1 file, 90 lines</dd></div>
+      <div><dt>Replay check</dt><dd>20 / 20 faulty services</dd></div>
+      <div><dt>False alarms</dt><dd>0 / 1,000 clean batches</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="glance-h">
+    <h2 id="glance-h">The project at a glance</h2>
+    <ol class="pipe">
+      <li class="quantum"><span class="tag quantum">quantum</span><b>The coin</b><span><code>|0⟩ ─ H ─ measure</code>. Each bit is 0 or 1 with chance 1/2.</span></li>
+      <li class="bug"><span class="tag bug">bug</span><b>The service</b><span>Clean keeps its generator. Faulty re-seeds on every request.</span></li>
+      <li class="classical"><span class="tag classical">classical</span><b>The batches</b><span>1,024 bits per request, 50 requests per service, order kept.</span></li>
+      <li class="check"><span class="tag check">check</span><b>The auditor</b><span>Frequency and replay checks. It sees only the bits.</span></li>
+      <li class="out"><span class="tag out">output</span><b>The evidence</b><span>False alarms, detections and misses, on fresh seeds.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="question-h">
+    <h2 id="question-h">1 · The question and the threat model</h2>
+    <p class="claim">We will investigate whether <b>re-seeding the simulator with the same seed on every request</b> can cause <b>identical "random" batches across requests</b>, and whether <b>a cross-request replay check</b> can detect it.</p>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th>Our answer</th><th>In plain words</th></tr></thead>
+        <tbody>
+          <tr><td>Protected property</td><td>Freshness: every request returns new bits</td><td>No customer gets bits that were already handed out.</td></tr>
+          <tr><td>Fault</td><td>The service re-seeds the simulator with its fixed seed on every request</td><td>One line of classical code in the wrong place; not a quantum effect.</td></tr>
+          <tr><td>Trusted components</td><td>The one-qubit model, Qiskit's <code>Statevector</code>, our auditor</td><td>We assume these work correctly.</td></tr>
+          <tr><td>Auditor access</td><td>Bits only, in order, with request boundaries</td><td>The auditor is like a customer: no seeds, no source code.</td></tr>
+          <tr><td>Exclusions</td><td>Real hardware, physical entropy, certification, cryptographic security</td><td>What we do not claim to test.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="section-intro"><b>Prediction:</b> the fault should break freshness, while the share of ones still looks normal. It held.</p>
+  </section>
+
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">2 · The code, step by step</h2>
+    <p class="section-intro">Every piece of <code>dice.py</code>, in the order it runs. Left: what goes in, what it does, what comes out, and why it matters. Right: the code (comments trimmed) and its real output.</p>
+    <ul class="legend">
+      <li><span class="tag quantum">quantum</span> the simulated coin</li>
+      <li><span class="tag classical">classical</span> service and evaluation code</li>
+      <li><span class="tag bug">bug</span> the modelled fault</li>
+      <li><span class="tag check">check</span> the auditor</li>
+      <li><span class="tag out">output</span> what you run</li>
+    </ul>
+    <ol class="flow">
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>The coin: <code>sample(n, rng)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>n = 1,024 and a random generator (or a seed number)</dd>
+            <dt>DO</dt><dd>Start one qubit in |0⟩, apply H to get an equal mix of 0 and 1, measure. Repeat n times, keeping the order.</dd>
+            <dt>OUT</dt><dd>a string of n bits, e.g. <code>111001011000…</code></dd>
+          </dl>
+          <p class="why"><b>Why:</b> by the Born rule each result has chance (1/√2)² = 1/2. A fair batch is rarely exactly 512 ones: 95% of batches have between 481 and 543.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">COIN = QuantumCircuit(1)
+COIN.h(0)
+
+def sample(n, rng):
+    sv = Statevector(COIN)
+    sv.seed(rng)
+    return "".join(sv.sample_memory(n))</pre>
+          <p>P(0) = P(1) = <b>0.5</b><br>95% band: <b>481–543</b> ones per 1,024</p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Clean service: <code>Clean(seed)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>a seed, given once when the service starts (e.g. 7)</dd>
+            <dt>DO</dt><dd>Creates one random generator and keeps it, so every request continues the same stream.</dd>
+            <dt>OUT</dt><dd>a new batch on every request</dd>
+          </dl>
+          <p class="why"><b>Why:</b> this is the correct pattern, like creating <code>rng = np.random.default_rng(7)</code> once at app start-up and reusing it.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">class Clean:
+    def __init__(self, seed):
+        self.rng = np.random.default_rng(seed)
+
+    def request(self):
+        return sample(BITS, self.rng)</pre>
+          <p>Clean(7), request 1: 111001011000001111110010… <b>507</b> ones<br>request 2: 101010111001001000001001… <b>504</b> ones<br><span class="good">different every time</span></p>
+        </div>
+      </li>
+      <li class="stage bug">
+        <div class="card">
+          <div class="card-head"><span class="tag bug">bug</span><h3>Faulty service: <code>Faulty(seed)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>the same seed</dd>
+            <dt>DO</dt><dd>Re-seeds on every request, so the stream restarts from the beginning each time.</dd>
+            <dt>OUT</dt><dd>the same batch on every request</dd>
+          </dl>
+          <p class="why"><b>Why:</b> like calling <code>random.seed(7)</code> inside the request handler. <b>Control:</b> with the same seed, Clean and Faulty give the same first batch, so the only difference is when the generator is created.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">class Faulty:
+    def __init__(self, seed):
+        self.seed = seed
+
+    def request(self):
+        return sample(BITS, self.seed)  # BUG</pre>
+          <p>Faulty(7), request 1: 111001011000001111110010… <b>507</b> ones<br>request 2: 111001011000001111110010… <b>507</b> ones<br><span class="hit">identical every time</span>, and equal to Clean(7) request 1</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Frequency check: <code>frequency_alarm(bits)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>one batch</dd>
+            <dt>DO</dt><dd>Counts the ones, then an exact binomial test asks: how surprising is this count for a fair coin? The answer is a p-value.</dd>
+            <dt>OUT</dt><dd>True (alarm) if p &lt; 0.01, which happens when a batch has 470 ones or fewer, or 554 or more</dd>
+          </dl>
+          <p class="why"><b>Why:</b> this is the "is it 50/50?" test the startup's claim invites. It would catch a biased coin, but it cannot see a replay, because a replayed batch looks like any normal batch.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">def frequency_alarm(bits):
+    return binomtest(bits.count("1"),
+                     len(bits)).pvalue &lt; 0.01</pre>
+          <p>507 ones → p = 0.78 → <b>no alarm</b><br>470 ones → p = 0.0095 → <span class="hit">alarm</span><br>on fair bits it alarms <b>0.946%</b> of the time</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Replay check: <code>replay_alarms(batches)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>all batches of one service, in request order</dd>
+            <dt>DO</dt><dd>Remembers every batch it has seen in a set. A batch that is already in the set raises an alarm.</dd>
+            <dt>OUT</dt><dd>one True or False per request</dd>
+          </dl>
+          <p class="why"><b>Why:</b> two fresh 1,024-bit batches are equal with chance 2⁻¹⁰²⁴, so in practice never. Any exact repeat is a real replay, and there is no threshold to tune.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">def replay_alarms(batches):
+    seen, alarms = set(), []
+    for bits in batches:
+        alarms.append(bits in seen)
+        seen.add(bits)
+    return alarms</pre>
+          <p>Faulty(1000) → [False, <span class="hit">True, True, True, True</span>, …]<br>Clean(1000) → [False, False, False, False, False, …]<br>the first answer is always False: nothing to compare with yet</p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Evaluation: <code>evaluate(seeds)</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>20 seeds, one service instance per seed</dd>
+            <dt>DO</dt><dd>For Clean and for Faulty: 20 instances × 50 requests = 1,000 batches. Both checks run on every batch; alarms are counted and replay misses noted by position.</dd>
+            <dt>OUT</dt><dd>alarm counts per service and check, plus where replay missed</dd>
+          </dl>
+          <p class="why"><b>Why:</b> it runs on two seed sets, like a train/test split. Tuning seeds 0–19 check the false-alarm rates; evaluation seeds 1000–1019 are fresh data that was never looked at.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">for Service in (Clean, Faulty):
+    for seed in seeds:
+        service = Service(seed)
+        batches = [service.request() for _ in range(REQUESTS)]
+        alarms = replay_alarms(batches)
+        freq += sum(map(frequency_alarm, batches))
+        replay += sum(alarms)</pre>
+          <p>Clean → frequency <b>13</b>, replay <b>0</b><br>Faulty → frequency <b>0</b>, replay <b>980</b><br>replay misses by position: {0: 20}</p>
+        </div>
+      </li>
+      <li class="stage out">
+        <div class="card">
+          <div class="card-head"><span class="tag out">output</span><h3>Run it: <code>python dice.py</code></h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>nothing: every seed is fixed in the file</dd>
+            <dt>DO</dt><dd>Runs 3 self-checks (same first batch, clean changes, faulty repeats), evaluates both seed sets, prints the tables and asserts the results.</dd>
+            <dt>OUT</dt><dd>the tables below, in about 3 seconds, the same on every run</dd>
+          </dl>
+          <p class="why"><b>Why:</b> the brief asks for a project that runs from a fresh process and reproduces its own numbers.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">$ python dice.py
+Evaluation set: seeds 1000-1019, 1000 batches of 1024 bits per service
+| Frequency | 13 / 1000 | 0 / 1000 |
+| Replay | 0 / 1000 | 980 / 1000 |
+replay misses by request position: {0: 20}</pre>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="results-h">
+    <h2 id="results-h">3 · Results on the fresh evaluation set</h2>
+    <p class="section-intro">Bars are drawn to scale, from 0% to 100% of 1,000 batches. Green is a false alarm on the clean service; red is a detection on the faulty one.</p>
+    <div class="panel bars">
+      <div class="bar-row">
+        <span class="bar-label">frequency</span>
+        <div class="bar-pair">
+          <div class="bar"><span class="track"><i class="clean" style="width:1.3%"></i></span><span class="val">clean 13 (1.3%)</span></div>
+          <div class="bar"><span class="track"><i class="faulty zero" style="width:0%"></i></span><span class="val">faulty 0 (0%)</span></div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">replay</span>
+        <div class="bar-pair">
+          <div class="bar"><span class="track"><i class="clean zero" style="width:0%"></i></span><span class="val">clean 0 (0%)</span></div>
+          <div class="bar"><span class="track"><i class="faulty" style="width:98%"></i></span><span class="val">faulty 980 (98%)</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Check</th><th>Seed set</th><th class="num">Clean: false alarms</th><th class="num">Faulty: detections</th><th>Faulty: missed</th></tr></thead>
+        <tbody>
+          <tr><td>Frequency</td><td>tuning 0–19</td><td class="num">8 / 1000</td><td class="num">0 / 1000</td><td>all 1,000</td></tr>
+          <tr><td>Frequency</td><td>evaluation 1000–1019</td><td class="num">13 / 1000</td><td class="num">0 / 1000</td><td>all 1,000</td></tr>
+          <tr><td>Replay</td><td>tuning 0–19</td><td class="num">0 / 1000</td><td class="num">980 / 1000</td><td>20, all request 1</td></tr>
+          <tr class="pass"><td>Replay</td><td>evaluation 1000–1019</td><td class="num">0 / 1000</td><td class="num">980 / 1000</td><td>20, all request 1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>How to read the table</h3>
+        <p>Clean batches should stay silent and faulty batches should raise an alarm. A <b>false alarm</b> is a clean batch flagged (a false positive), a <b>detection</b> is a faulty batch flagged (a true positive), and a <b>miss</b> is a faulty batch not flagged (a false negative).</p>
+      </div>
+      <div class="panel">
+        <h3>Why the frequency check sees nothing</h3>
+        <p>A faulty batch is a genuine fair sample; the bug is only that it comes back again. The 20 faulty batches in the evaluation had 477 to 532 ones, all inside the silent zone of 471 to 553. Counting ones cannot see a repeat across requests.</p>
+      </div>
+      <div class="panel">
+        <h3>The 20 misses</h3>
+        <p>Every miss is request 1 of a faulty service. The first batch is the original, and a replay can only be recognised once there is something to compare it with: <code>{0: 20}</code>.</p>
+      </div>
+      <div class="panel">
+        <h3>1,000 faulty batches are really 20</h3>
+        <p>Inside one faulty service all 50 batches are copies, so the independent evidence is 20 services. Replay caught 20 / 20 from request 2 onward; frequency caught 0 / 20. Twenty cases is a small sample, and the report says so.</p>
+      </div>
+      <div class="panel">
+        <h3>Are 13 false alarms a problem?</h3>
+        <p>No. On fair bits the frequency check alarms 0.946% of the time, about 9 per 1,000 batches, so 8 and 13 are normal variation. Replay had 0, as expected when a chance match has probability 2⁻¹⁰²⁴.</p>
+      </div>
+      <div class="panel">
+        <h3>Why two seed sets</h3>
+        <p>Like a train/test split. Both thresholds were fixed in advance: the usual 1% level, and the exact-match rule has no parameter. The tuning set only confirmed the false-alarm rates; the evaluation set is fresh, and nothing was changed after seeing it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="words-h">
+    <h2 id="words-h">4 · Words you need</h2>
+    <dl class="glossary">
+      <div><dt>Qubit</dt><dd>A bit that can be in a mix of 0 and 1 until it is measured.</dd></div>
+      <div><dt>|0⟩</dt><dd>The qubit's starting state: definitely 0.</dd></div>
+      <div><dt>Hadamard gate (H)</dt><dd>Turns |0⟩ into an equal mix of |0⟩ and |1⟩.</dd></div>
+      <div><dt>Measurement</dt><dd>Reading the qubit. It gives 0 or 1, and the mix is gone.</dd></div>
+      <div><dt>Born rule</dt><dd>The chance of each result is its amplitude squared: (1/√2)² = 1/2.</dd></div>
+      <div><dt>Seed</dt><dd>The starting number of a pseudorandom generator. The same seed gives the same sequence.</dd></div>
+      <div><dt>Generator</dt><dd>The object that produces the pseudorandom stream. Keeping it continues the stream.</dd></div>
+      <div><dt>Request and batch</dt><dd>One call to the service, which returns one batch of 1,024 bits.</dd></div>
+      <div><dt>Freshness</dt><dd>Every batch is new: nobody gets bits that were already handed out.</dd></div>
+      <div><dt>Replay</dt><dd>Serving bits that were already served.</dd></div>
+      <div><dt>Binomial test and p-value</dt><dd>How surprising a count of ones is for a fair coin. p &lt; 0.01 means less than a 1% chance by luck.</dd></div>
+      <div><dt>False alarm, detection, miss</dt><dd>False positive, true positive, false negative.</dd></div>
+      <div><dt>Tuning and evaluation set</dt><dd>A train/test split: report the numbers from the fresh set only.</dd></div>
+      <div><dt>Pseudo-replication</dt><dd>Counting copies of the same evidence as if they were independent cases.</dd></div>
+    </dl>
+  </section>
+
+  <section class="panel" aria-labelledby="predict-h">
+    <h2 id="predict-h">5 · Predict a new case</h2>
+    <p>The jury may change one thing and ask what happens. Our answers:</p>
+    <ul class="qa">
+      <li><span class="ask">Bigger batches, 2,048 bits?</span><span class="ans">Frequency still alarms on about 1% of clean batches and still misses the replay. Replay still flags every faulty request from the second one on: an exact copy does not depend on size.</span></li>
+      <li><span class="ask">The service re-seeds only on every 10th request?</span><span class="ans">Requests 1–10 are fresh, then 11–20 replay 1–10, and so on. Replay flags 40 of 50 requests per service and misses the first cycle of 10.</span></li>
+      <li><span class="ask">A new seed on every request, but a guessable one (seed + request number)?</span><span class="ans">Every batch is different, so replay never fires and frequency passes. Yet anyone who knows the scheme can regenerate every batch. Our checks cannot see predictability; only fixing the seeding can.</span></li>
+      <li><span class="ask">The replay is shifted by one bit?</span><span class="ans">Exact matching misses it, because the batch is no longer an identical string. It would need a substring or similarity check.</span></li>
+      <li><span class="ask">A biased coin with P(1) = 0.6?</span><span class="ans">That is the frequency check's job. About 614 ones are expected, far above 554, so almost every batch alarms; replay stays silent.</span></li>
+    </ul>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="resp-h">
+      <h2 id="resp-h">6 · Recommended response</h2>
+      <ol>
+        <li><b>Fix the cause:</b> create the generator once per service lifetime from OS entropy and never re-seed per request. Add a test that two requests differ.</li>
+        <li><b>Monitor:</b> run the replay check inside the service and stop serving bits when it fires.</li>
+        <li><b>Detection is not repair:</b> every batch served since the bug is compromised. Tell consumers and regenerate anything derived from it.</li>
+      </ol>
+    </section>
+    <section class="panel" aria-labelledby="lim-h">
+      <h2 id="lim-h">Limitations</h2>
+      <ul>
+        <li>Simulation only: pseudorandom bits, not physical entropy. Distinct seeds do not prove independence.</li>
+        <li>One fault and one batch size; the faulty evidence rests on 20 distinct batches.</li>
+        <li>Replay misses the first faulty request, shifted or partial replays, and output that is unique but predictable.</li>
+        <li>An alarm means "investigate", not "an attacker is present". Passing our checks proves nothing about quantumness or security.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="jury-h">
+    <h2 id="jury-h">Say it to the jury</h2>
+    <ol class="jury">
+      <li><q>The faulty service gave perfectly balanced bits, 477 to 532 ones per 1,024, and passed the frequency check every time: a balanced histogram proves nothing.</q></li>
+      <li><q>Our replay check caught all 20 faulty services from their second request, with 0 false alarms on 1,000 fresh clean batches.</q></li>
+      <li><q>It cannot see bits that are unique but predictable, so the real fix is seeding the generator once from OS entropy.</q></li>
+    </ol>
+  </section>
+
+  <footer>Local simulation. Qiskit samples with a pseudorandom generator, so these bits model a quantum source and must not be used for keys. Numbers come from <code>quantum_dice_simple/dice.py</code> (about 3 seconds); the earlier, larger version is in <code>quantum_dice/</code>.</footer>
+</main>
+</body>
+</html>

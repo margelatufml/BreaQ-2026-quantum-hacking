@@ -1,0 +1,7 @@
+[     2s] E ok: semiclassical N=15 a=7 gates=False: 5 qubits, 2000-shot TV 0.015
+[     3s] E ok: semiclassical N=21 a=2 gates=False: 6 qubits, 2000-shot TV 0.046
+[     5s] E ok: semiclassical N=63 a=2 gates=False: 7 qubits, 2000-shot TV 0.051
+[     7s] E ok: semiclassical N=35 a=2 gates=False: 7 qubits, 2000-shot TV 0.063
+[    24s] E ok: semiclassical N=15 a=7 gates=True: 11 qubits, 2000-shot TV 0.015
+[   106s] E ok: semiclassical N=21 a=2 gates=True: 13 qubits, 2000-shot TV 0.046
+[  1028s] E ok: 6-bit semiclassical N=63 a=2, 15 qubits, 2000-shot TV 0.051

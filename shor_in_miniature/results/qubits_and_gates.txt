@@ -1,0 +1,13 @@
+builder, N, a: qubits, instructions (top-level, UnitaryGate counts as 1), by name
+build_shor                   N=15 a=7: qubits=12 instructions=    61  {'cp': 28, 'h': 16, 'unitary': 8, 'measure': 8, 'x': 1}
+build_shor_level2            N=15 a=7: qubits=18 instructions=  6003  
+semiclassical gates=True     N=15 a=7: qubits=11 instructions=  6010  
+semiclassical gates=False    N=15 a=7: qubits= 5 instructions=    68  {'if_else': 28, 'h': 16, 'unitary': 8, 'measure': 8, 'reset': 7, 'x': 1}
+build_shor                   N=21 a=2: qubits=15 instructions=    86  {'cp': 45, 'h': 20, 'unitary': 10, 'measure': 10, 'x': 1}
+build_shor_level2            N=21 a=2: qubits=22 instructions= 12286  
+semiclassical gates=True     N=21 a=2: qubits=13 instructions= 12295  
+semiclassical gates=False    N=21 a=2: qubits= 6 instructions=    95  {'if_else': 45, 'h': 20, 'unitary': 10, 'measure': 10, 'reset': 9, 'x': 1}
+build_shor                   N=63 a=2: qubits=18 instructions=   115  {'cp': 66, 'h': 24, 'unitary': 12, 'measure': 12, 'x': 1}
+build_shor_level2            N=63 a=2: qubits=26 instructions= 22183  
+semiclassical gates=True     N=63 a=2: qubits=15 instructions= 22194  
+semiclassical gates=False    N=63 a=2: qubits= 7 instructions=   126  {'if_else': 66, 'h': 24, 'unitary': 12, 'measure': 12, 'reset': 11, 'x': 1}

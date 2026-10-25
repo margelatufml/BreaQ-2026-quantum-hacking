@@ -1,0 +1,4 @@
+@page { size: A4; margin: 2cm; }
+body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; line-height: 1.3; }
+table { border-collapse: collapse; font-size: 9pt; } td, th { border: 1px solid #999; padding: 2px 4px; }
+h1 { font-size: 15pt; margin: 0 0 6pt; } h2 { font-size: 12pt; margin: 8pt 0 3pt; } p, ul { margin: 3pt 0; }

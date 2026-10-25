@@ -1,0 +1,13 @@
+phase,service,check,batches,alarms,rate
+tuning,clean,frequency,1000,8,0.008
+tuning,clean,repetition,1000,1,0.001
+tuning,clean,replay,1000,0,0.0
+tuning,faulty,frequency,1000,0,0.0
+tuning,faulty,repetition,1000,0,0.0
+tuning,faulty,replay,1000,980,0.98
+evaluation,clean,frequency,1000,13,0.013
+evaluation,clean,repetition,1000,1,0.001
+evaluation,clean,replay,1000,0,0.0
+evaluation,faulty,frequency,1000,0,0.0
+evaluation,faulty,repetition,1000,0,0.0
+evaluation,faulty,replay,1000,980,0.98

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BB84 Bob Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="diagrams.css">
+</head>
+<body>
+<main class="page">
+  <nav class="crumbs"><a href="index.html">All diagrams</a><a href="ch1-trust-no-input.html">Trust No Input</a><a href="quantum-dice.html">Quantum Dice</a><a href="shor-in-miniature.html">Shor in Miniature</a></nav>
+
+  <header>
+    <span class="eyebrow">BreaQ 2026 · Quantum Hacking · Catch the Eavesdropper (Blue Track)</span>
+    <h1>BB84: Bob's Side</h1>
+    <p class="lede">Turn 200,000 noisy, possibly eavesdropped qubits into a secret key that matches Alice's, or abort. Noise and an eavesdropper look identical, so every error is paid for as if Eve caused it.</p>
+    <dl class="facts">
+      <div><dt>Sent</dt><dd>200,000 qubits</dd></div>
+      <div><dt>Channel</dt><dd>3% noise, Eve on 1%</dd></div>
+      <div><dt>Error bound Q_u</dt><dd>3.86%</dd></div>
+      <div><dt>Final secret key</dt><dd>42,856 bits</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="glance-h">
+    <h2 id="glance-h">The project at a glance</h2>
+    <ol class="pipe">
+      <li class="quantum"><span class="tag quantum">quantum</span><b>Qubits</b><span>Alice sends 200,000 in random bases. Bob measures in his own random bases.</span></li>
+      <li class="classical"><span class="tag classical">classical</span><b>Sift</b><span>Keep the positions where the bases match: 99,885 bits.</span></li>
+      <li class="check"><span class="tag check">check</span><b>Test</b><span>Sacrifice 20,000 bits to measure the error. Bound it: Q_u = 3.86%. Abort above 11%.</span></li>
+      <li class="classical"><span class="tag classical">classical</span><b>Repair</b><span>Cascade fixes every error, a hash confirms. It leaks 18,110 bits.</span></li>
+      <li class="out"><span class="tag out">output</span><b>Key</b><span>Subtract what Eve may know and what leaked, then squeeze: 42,856 bits.</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="funnel-h">
+    <h2 id="funnel-h">1 · Where the bits go</h2>
+    <p class="section-intro">Bars drawn to scale against the 200,000 qubits Alice sends. Example run: <code>python bob.py --qber 0.03 --eve 0.01 --seed 1</code>.</p>
+    <div class="panel funnel">
+      <div class="funnel-row"><span><b>200,000</b> qubits sent, each in a random basis</span><i style="width:100%"></i></div>
+      <div class="funnel-row"><span><b>99,885</b> kept after sifting (bases matched)</span><i style="width:49.94%"></i></div>
+      <div class="funnel-row"><span><b>79,885</b> left after spending 20,000 on the error test</span><i style="width:39.94%"></i></div>
+      <div class="funnel-row key"><span><b>42,856</b> bits of final secret key</span><i style="width:21.43%"></i></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="toy-h">
+    <h2 id="toy-h">2 · Sifting on a toy example</h2>
+    <p class="section-intro">12 qubits instead of 200,000. Basis 0 = Z, qubit is |0⟩ or |1⟩. Basis 1 = X, qubit is |+⟩ or |−⟩. Bob keeps a position only when the two bases are equal.</p>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Position</th><th class="num">0</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th><th class="num">5</th><th class="num">6</th><th class="num">7</th><th class="num">8</th><th class="num">9</th><th class="num">10</th><th class="num">11</th></tr></thead>
+        <tbody>
+          <tr><td>Alice basis</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">0</td></tr>
+          <tr><td>Alice bit</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">0</td></tr>
+          <tr><td>Bob basis</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td class="num">1</td></tr>
+          <tr><td>Bob result</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td class="num">1</td><td class="num">1</td></tr>
+          <tr class="pass"><td>Kept?</td><td class="num">no</td><td class="num">yes</td><td class="num">yes</td><td class="num">yes</td><td class="num">no</td><td class="num">yes</td><td class="num">yes</td><td class="num">no</td><td class="num">no</td><td class="num">no</td><td class="num">yes</td><td class="num">no</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Read it</h3>
+        <p>Kept positions: <b>1, 2, 3, 5, 6, 10</b>, six of 12, about half. At each of them Alice's bit and Bob's result agree.</p>
+      </div>
+      <div class="panel">
+        <h3>The dropped ones</h3>
+        <p>With different bases Bob's result is a coin flip. Position 0 agrees by luck; positions 7, 8, 9 and 11 do not. That is why they are thrown away. In the real run 99,885 of 200,000 are kept.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">3 · The protocol, from Bob's side</h2>
+    <p class="section-intro">Every step of <code>bob.py</code>, in the order it runs. Left: what goes in, what it does, what comes out, and why. Right: the code reference (<code>bob.py</code>, <code>bb84.py</code>, <code>alice_sim.py</code>) and the real output of the traced run.</p>
+    <ul class="legend">
+      <li><span class="tag quantum">quantum</span> the qubits</li>
+      <li><span class="tag classical">classical</span> public-channel processing</li>
+      <li><span class="tag check">check</span> a go / abort decision</li>
+      <li><span class="tag out">output</span> the key and message</li>
+    </ul>
+    <ol class="flow">
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Session start</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>a <code>start</code> call. The simulated Alice was built with N = 200,000, k = 20,000, 3% noise, Eve on 1%.</dd>
+            <dt>DO</dt><dd>Alice draws her N random bases and N random bits and returns the session parameters.</dd>
+            <dt>OUT</dt><dd>N, k, ε and the length of the waiting message</dd>
+          </dl>
+          <p class="why"><b>Why:</b> both sides must agree on how many qubits are sent and which message is waiting before anything starts.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">info = t.call("start")
+N = info["N"]</pre>
+          <p><b>bob.py:104-106</b> → alice_sim.py:48-52<br>{'N': 200000, 'k': 20000, 'eps': 1e-10, 'message_len': 44}</p>
+        </div>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Alice prepares</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>random generator, seed 1, N = 200,000</dd>
+            <dt>DO</dt><dd>Draws a random basis and a random bit for every qubit. The pair is the qubit she sends: (0,0) = |0⟩, (0,1) = |1⟩, (1,0) = |+⟩, (1,1) = |−⟩.</dd>
+            <dt>OUT</dt><dd>200,000 prepared qubits; Alice keeps her two arrays</dd>
+          </dl>
+          <p class="why"><b>Why:</b> BB84 security comes from Alice using random bases that an eavesdropper cannot know in advance.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">self.a_bases = self.rng.integers(0, 2, self.N, dtype=np.uint8)
+self.a_bits  = self.rng.integers(0, 2, self.N, dtype=np.uint8)</pre>
+          <p><b>alice_sim.py:49-50</b><br>bases: 99,857 zeros, 100,143 ones<br>bits: 100,124 ones<br>first 10 (basis,bit): (1,1) (1,1) (0,1) (1,1) (1,1) (0,0) (1,0) (0,0) (1,0) (1,0)</p>
+        </div>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Bob measures</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Bob's own random generator; 200,000 bases sent as a '0'/'1' string</dd>
+            <dt>DO</dt><dd>The simulator lets Eve intercept about 1% of qubits in a random basis and re-send. Bob gets Alice's bit where the bases agree and a random bit where they do not. Each result is flipped with probability 3%.</dd>
+            <dt>OUT</dt><dd>200,000 measured bits</dd>
+          </dl>
+          <p class="why"><b>Why:</b> Bob must measure without knowing Alice's bases, so that an eavesdropper who also guesses wrong disturbs the result.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">bb = rng.integers(0, 2, N, dtype=np.uint8)
+bob_bits = s2b(t.call("quantum",
+                      bob_bases=b2s(bb))["bob_bits"])</pre>
+          <p><b>bob.py:109-111</b> → alice_sim.py:54-77<br>Bob bases: 100,054 zeros, 99,946 ones<br>first 10 bases: [0,1,0,1,0,0,1,1,0,0]<br>first 10 results: [0,1,1,1,1,0,0,1,0,0]</p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Sifting</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Alice's 200,000 bases (revealed only after Bob measured), Bob's bases and results</dd>
+            <dt>DO</dt><dd>Keeps Bob's result where his basis equals Alice's, and throws the rest away.</dd>
+            <dt>OUT</dt><dd>99,885 bits kept (49.94%), 100,115 discarded</dd>
+          </dl>
+          <p class="why"><b>Why:</b> where the bases differ, Bob's result is a coin flip carrying no information about Alice's bit.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">same = ab == bb
+xb, bases = bob_bits[same], bb[same]</pre>
+          <p><b>bob.py:112-115</b> → alice_sim.py:79-82<br>n_sift = <b>99,885</b></p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Test sample</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>n_sift = 99,885 and k = 20,000</dd>
+            <dt>DO</dt><dd>Alice picks 20,000 distinct random positions of the sifted key and publishes the positions and her bits there.</dd>
+            <dt>OUT</dt><dd>20,000 positions, all unique, range 1 to 99,879</dd>
+          </dl>
+          <p class="why"><b>Why:</b> comparing a random sample of the key is the only way to measure how noisy (or eavesdropped) the channel was.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">self.pos = self.rng.integers(0, n, self.k) if self.dup \
+    else self.rng.choice(n, self.k, replace=False)
+self._leak("test", self.k, "test")</pre>
+          <p><b>alice_sim.py:85-91</b>; bob.py:118-122 (np.unique guard)<br>first 5: [15726, 36779, 81102, 28098, 65216]<br>ledger learned['test'] = <b>20,000</b></p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Error estimate Q̂</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Alice's 20,000 test bits against Bob's bits at the same positions. Bob sends his 20,000 bits back.</dd>
+            <dt>DO</dt><dd>Counts the mismatches m and computes Q̂ = m / k.</dd>
+            <dt>OUT</dt><dd>m = 605, Q̂ = 0.03025</dd>
+          </dl>
+          <p class="why"><b>Why:</b> the mismatch rate on the sample estimates the error rate on the rest of the key. By basis: Z 3.00%, X 3.05%, so no basis asymmetry.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">wrong = abits[first] != xb[u]
+m, k = int(wrong.sum()), len(u)
+q_hat, q_u = m / k, BOUNDS[bound](m, k, eps)</pre>
+          <p><b>bob.py:123-130</b><br>m = <b>605</b>, k = 20,000<br>Q̂ = <b>0.03025</b><br>Z 0.03002 · X 0.03047 · warnings []</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Clopper-Pearson bound and abort check</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>m = 605, k = 20,000, ε = 10⁻¹⁰, abort threshold 0.11</dd>
+            <dt>DO</dt><dd>Turns the sample rate into a worst-case upper bound Q_u that holds except with probability 10⁻¹⁰. Aborts and discards everything if Q_u &gt; 0.11.</dd>
+            <dt>OUT</dt><dd>Q_u = 0.0386 &lt; 0.11, so no abort</dd>
+          </dl>
+          <p class="why"><b>Why:</b> a sample of 20,000 can be unlucky, so Bob plans for the worst error rate that is still plausible. Above about 11% no secret key is possible.</p>
+          <span class="branch">abort if Q_u &gt; 11%</span>
+        </div>
+        <div class="note code-note">
+<pre class="code">def q_cp(m, k, eps=EPS):
+    return 1.0 if m &gt;= k else float(
+        beta.ppf(1 - eps, m + 1, k - m))
+...
+if q_u &gt; q_abort:
+    res["abort"] = f"Q_u={q_u:.4f} &gt; {q_abort}"
+    return res</pre>
+          <p><b>bb84.py:39-40</b>, bob.py:139-141, Q_ABORT bb84.py:19<br>Clopper-Pearson Q_u = <b>0.03863</b> (used)<br>Hoeffding Q_u = 0.05424<br>Alice's reply: {'abort': False, 'n_key': 79885}</p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Drop the test bits</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>99,885 sifted bits, 20,000 test positions</dd>
+            <dt>DO</dt><dd>Removes the published test positions from Bob's key. Alice does the same.</dd>
+            <dt>OUT</dt><dd>n = 79,885</dd>
+          </dl>
+          <p class="why"><b>Why:</b> those bits are now public, so they cannot be part of a secret key.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">keep = np.ones(len(xb), bool)
+keep[u] = False
+xb = xb[keep]</pre>
+          <p><b>bob.py:142-146</b><br>n = 99,885 − 20,000 = <b>79,885</b></p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Cascade error correction</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>79,885 bits; block size b = round(0.73 / 0.03025) = 24, so passes of 24, 72 and 216 bits</dd>
+            <dt>DO</dt><dd>Per pass: ask Alice for the parity of every block, bisect each block that differs until one wrong bit is found, flip it. Passes 1 and 2 shuffle the bits first. Back-tracking re-searches earlier passes whose blocks turned odd.</dd>
+            <dt>OUT</dt><dd>0 errors left (2,590 before), at a price of 18,070 parities</dd>
+          </dl>
+          <p class="why"><b>Why:</b> a block of about 0.73 / Q bits usually holds 0 or 1 errors, which is when a parity check helps most. Shuffling moves leftover errors into different blocks. Every parity is a leaked bit.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">for j, B in enumerate(block_sizes):
+    perm = np.arange(n) if (j == 0 and pass_base == 0) \
+        else np.asarray(get_perm(pass_base + j))
+    ...
+    status.append(oracle(pass_base + j, lo, hi)
+                  ^ _par(x[perm], lo, hi))
+    ...
+    found = search(i, idx)
+    x[found] ^= 1</pre>
+          <p><b>bb84.py:66-118</b>, bob.py:149-158<br>pass 0 (24): 3,329 block parities, <b>11,771</b> in total<br>pass 1 (72): 1,110 block parities, <b>5,929</b> in total<br>pass 2 (216): <b>370</b>, all equal, no bisection<br>11,771 + 5,929 + 370 = <b>18,070</b> (131 parity calls)<br>errors after: 0 of 79,885</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Hash check</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Bob's corrected key and Alice's 40-bit hash</dd>
+            <dt>DO</dt><dd>Bob hashes his own key and tells Alice whether the two match. On a mismatch Cascade runs again, up to 3 attempts.</dd>
+            <dt>OUT</dt><dd>match on attempt 1: <code>2c08c4fae7</code></dd>
+          </dl>
+          <p class="why"><b>Why:</b> Cascade can leave an undetected error. A hash match confirms with high probability that both keys are identical before the secret is built. The hash is our own SHA-256 prefix, not the organisers'.</p>
+          <span class="branch">third mismatch: discard the key</span>
+        </div>
+        <div class="note code-note">
+<pre class="code">h = t.call("verify", nbits=t_hash)["hash"]
+learned["hash"] += t_hash
+ok = h == hash_fn(xb, t_hash)</pre>
+          <p><b>bob.py:165-183</b>, bb84.py:122-125<br>Alice '2c08c4fae7' = Bob '2c08c4fae7'<br>ok = True · attempts = <b>1</b><br>learned['hash'] = 40</p>
+        </div>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>Key length l</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>n = 79,885; Q_u = 0.03863; leak_EC = 18,070 parity + 40 hash = 18,110; ε_PA = 10⁻¹⁰</dd>
+            <dt>DO</dt><dd>Starts from n, subtracts what Eve may know if she caused every error, everything leaked, and a safety margin. Bob uses the smaller of his l and Alice's l.</dd>
+            <dt>OUT</dt><dd>l = 42,856</dd>
+          </dl>
+          <p class="why"><b>Why:</b> this is the amount of key that stays secret even if every error and every disclosed bit is blamed on Eve. Both sides computing the same number is a consistency check.</p>
+          <span class="branch">abort if l ≤ 0</span>
+        </div>
+        <div class="note code-note">
+<pre class="code">def key_length(n, q_u, leak_ec, eps_pa=EPS):
+    return (n - n * h2(q_u) - leak_ec
+            - 2 * math.log2(1 / eps_pa))</pre>
+          <p><b>bb84.py:46-48</b>, bob.py:186-196<br>h(Q_u) = 0.23599 → n·h = <b>18,851.8</b><br>margin 2·log₂(1/ε) = <b>66.44</b><br>79,885 − 18,851.8 − 18,110 − 66.44 = 42,856.76<br>Bob's l = 42,856 · Alice's l = 42,856 → l = <b>42,856</b></p>
+        </div>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Toeplitz privacy amplification</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Alice's seed of 122,741 bits (= n + l) and Bob's corrected key x of 79,885 bits</dd>
+            <dt>DO</dt><dd>Builds the 42,856 × 79,885 Toeplitz matrix implicitly from 122,740 seed bits and computes T·x mod 2 by FFT convolution.</dd>
+            <dt>OUT</dt><dd>final key of 42,856 bits, equal to Alice's</dd>
+          </dl>
+          <p class="why"><b>Why:</b> multiplying by a random Toeplitz matrix squeezes the partly known key into a shorter one that Eve knows essentially nothing about. The seed can be public.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">c = fftconvolve(d, x.astype(np.float64))
+return (np.rint(c[n - 1: n - 1 + l])
+        .astype(np.int64) &amp; 1).astype(np.uint8)</pre>
+          <p><b>bb84.py:134-154</b>, alice_sim.py:151-154<br>dense matrix: 3,423,551,560 entries, never built<br>Bob's key = Alice's key: <b>True</b><br>first 16 bits: 0010 0100 1100 0000</p>
+        </div>
+      </li>
+      <li class="stage out">
+        <div class="card">
+          <div class="card-head"><span class="tag out">output</span><h3>One-time pad</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>ciphertext of 44 bytes (352 bits) and the final key</dd>
+            <dt>DO</dt><dd>XORs the ciphertext with the first 352 key bits.</dd>
+            <dt>OUT</dt><dd>the plaintext, equal to Alice's message</dd>
+          </dl>
+          <p class="why"><b>Why:</b> this proves the shared key works. A one-time pad is only secure if the key is secret and used once.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">pad = np.packbits(np.asarray(key_bits[:need],
+        np.uint8), bitorder=bitorder).tobytes()
+return bytes(a ^ b for a, b in zip(data, pad))</pre>
+          <p><b>bb84.py:166-172</b>, bob.py:198, 209<br>b'BreaQ-2026 BB84 OK: ffe42279f3bd068366a852c1'<br>equals Alice's message: <b>True</b><br>42,504 key bits unused</p>
+        </div>
+      </li>
+      <li class="stage out">
+        <div class="card">
+          <div class="card-head"><span class="tag out">output</span><h3>Finish and the leak ledger</h3></div>
+          <dl class="io">
+            <dt>IN</dt><dd>Bob's plaintext in hex</dd>
+            <dt>DO</dt><dd>Alice compares it with her message and returns her ledger of everything she revealed.</dd>
+            <dt>OUT</dt><dd>success, l = 42,856, leak total 38,110</dd>
+          </dl>
+          <p class="why"><b>Why:</b> the leak total is what the organisers would score, so Bob checks that it matches his own ledger.</p>
+        </div>
+        <div class="note code-note">
+<pre class="code">res["final"] = t.call("finish",
+                      plaintext=plain.hex())</pre>
+          <p><b>bob.py:211</b> → alice_sim.py:162-166<br>{'success': True, 'l': 42856,<br>&nbsp;'leak': {'test': 20000, 'parity': 18070, 'hash': 40},<br>&nbsp;'leak_total': 38110, 'state': 'amplified'}<br>143 transport calls (131 parity) · 0.0624 s</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="budget-h">
+    <h2 id="budget-h">4 · The key-length budget</h2>
+    <p class="section-intro">The 79,885 corrected bits, split to scale. Only the green part survives as secret key.</p>
+    <div class="panel">
+      <div class="stack" role="img" aria-label="79,885 bits split into 18,852 Eve may know, 18,110 leaked by error correction, 66 safety margin and 42,856 final key">
+        <i class="eve" style="width:23.599%"></i><i class="leak" style="width:22.670%"></i><i class="safety" style="width:0.083%"></i><i class="key" style="width:53.647%"></i>
+      </div>
+      <ul class="stack-legend">
+        <li><span class="swatch" style="background:var(--bug)"></span>18,852 what Eve may know, n·h(Q_u)</li>
+        <li><span class="swatch" style="background:var(--classical)"></span>18,110 leaked by Cascade and the hash</li>
+        <li><span class="swatch" style="background:var(--fg)"></span>66 safety margin, 2·log₂(1/ε)</li>
+        <li><span class="swatch" style="background:var(--ok)"></span>42,856 final secret key</li>
+      </ul>
+    </div>
+  </section>
+
+  <section aria-labelledby="why-h">
+    <h2 id="why-h">5 · Why each choice</h2>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Clopper-Pearson, not Hoeffding</h3>
+        <p>Both bounds hold except with probability 10⁻¹⁰. Clopper-Pearson is tighter: Q_u 3.86% against 5.42%. A tighter bound means less charged to Eve: <b>42,856</b> key bits against <b>37,411</b>.</p>
+      </div>
+      <div class="panel">
+        <h3>Back-tracking Cascade, not the brief's 24 / 24 / 24</h3>
+        <p>Passes of 24, 72, 216 with back-tracking give <b>42,856</b> bits. The brief's literal three passes of 24 give <b>28,842</b>, and the first hash check mismatched. A mismatch means another Cascade run, which leaks more parities.</p>
+      </div>
+      <div class="panel">
+        <h3>Why 11%</h3>
+        <p>The brief's abort threshold. Above about 11% the channel is too noisy or too eavesdropped for any secret key. 12% noise with no Eve already gives Q_u 13.22%, and the run aborts.</p>
+      </div>
+      <div class="panel">
+        <h3>Why every error is charged to Eve</h3>
+        <p>Bob cannot tell noise from an eavesdropper. So n·h(Q_u) = 18,852 bits, 23.6% of the 79,885, are assumed known to Eve and removed from the key.</p>
+      </div>
+      <div class="panel">
+        <h3>Why the Toeplitz multiply uses an FFT</h3>
+        <p>The matrix is 42,856 × 79,885 = 3,423,551,560 entries. It is a Toeplitz matrix, so T·x is a convolution of the seed with the key, and an FFT does it without building the matrix. The whole run takes 0.0624 s.</p>
+      </div>
+      <div class="panel">
+        <h3>Why the hash bits count as leakage</h3>
+        <p>The 40 hash bits come from Alice over the public channel, so Eve hears them too. leak_EC = 18,070 parity + 40 hash = <b>18,110</b>. Alice's full ledger: 20,000 test + 18,070 parity + 40 hash = 38,110.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sweep-h">
+    <h2 id="sweep-h">6 · The sweep: noise and Eve</h2>
+    <p class="section-intro">Verified runs of the same code. Key bars are drawn to scale against 200,000 qubits. More noise means a larger Q_u and a shorter key; past 11% the run aborts.</p>
+    <div class="panel funnel">
+      <div class="funnel-row key"><span><b>61,083</b> key bits at 1% noise</span><i style="width:30.54%"></i></div>
+      <div class="funnel-row key"><span><b>51,695</b> key bits at 2% noise</span><i style="width:25.85%"></i></div>
+      <div class="funnel-row key"><span><b>42,856</b> key bits at 3% noise (the traced run)</span><i style="width:21.43%"></i></div>
+      <div class="funnel-row key"><span><b>34,472</b> key bits at 4% noise</span><i style="width:17.24%"></i></div>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Channel</th><th class="num">Q_u</th><th class="num">Final key</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>noise 1%, Eve on 1%</td><td class="num">1.74%</td><td class="num">61,083</td><td>key</td></tr>
+          <tr><td>noise 2%, Eve on 1%</td><td class="num">2.76%</td><td class="num">51,695</td><td>key</td></tr>
+          <tr class="pass"><td>noise 3%, Eve on 1%</td><td class="num">3.86%</td><td class="num">42,856</td><td>key</td></tr>
+          <tr><td>noise 4%, Eve on 1%</td><td class="num">4.95%</td><td class="num">34,472</td><td>key</td></tr>
+          <tr class="highlight"><td>noise 3%, Eve on 50% of qubits</td><td class="num">16.21%</td><td class="num">none</td><td>ABORT</td></tr>
+          <tr class="highlight"><td>noise 12%, no Eve</td><td class="num">13.22%</td><td class="num">none</td><td>ABORT</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="words-h">
+    <h2 id="words-h">7 · Words you need</h2>
+    <dl class="glossary">
+      <div><dt>Sifting</dt><dd>Keeping only the positions where Alice's and Bob's bases are equal.</dd></div>
+      <div><dt>Basis</dt><dd>How a qubit is encoded or measured. Z gives |0⟩ or |1⟩; X gives |+⟩ or |−⟩.</dd></div>
+      <div><dt>QBER</dt><dd>Quantum bit error rate: the share of sifted bits where Bob and Alice disagree.</dd></div>
+      <div><dt>Test sample</dt><dd>k = 20,000 sifted bits both sides reveal to measure the error rate. They are then thrown away.</dd></div>
+      <div><dt>Clopper-Pearson</dt><dd>An exact worst-case upper bound on the true error rate from m errors in k tests.</dd></div>
+      <div><dt>Hoeffding</dt><dd>A looser bound: Q̂ + √(ln(1/ε) / 2k). Simpler, but it costs key bits.</dd></div>
+      <div><dt>Abort threshold</dt><dd>If Q_u is above 11%, discard everything; no key is issued.</dd></div>
+      <div><dt>Cascade</dt><dd>Error correction by comparing block parities and bisecting the blocks that differ.</dd></div>
+      <div><dt>Parity</dt><dd>Whether a block has an even or odd number of ones. One bit, and one leaked bit.</dd></div>
+      <div><dt>Back-tracking</dt><dd>After a fix, re-searching earlier passes whose blocks turned odd.</dd></div>
+      <div><dt>leak_EC</dt><dd>All bits revealed during error correction: parities plus the hash. Subtracted from the key.</dd></div>
+      <div><dt>Binary entropy h</dt><dd>h(x) = −x·log₂x − (1−x)·log₂(1−x): how many bits of uncertainty an error rate x hides.</dd></div>
+      <div><dt>Privacy amplification</dt><dd>Shrinking the corrected key to a shorter one Eve knows essentially nothing about.</dd></div>
+      <div><dt>Toeplitz matrix</dt><dd>A matrix with constant diagonals, so a short random seed defines all of it.</dd></div>
+      <div><dt>One-time pad</dt><dd>XOR a message with a secret key of the same length, used once.</dd></div>
+      <div><dt>Intercept-resend</dt><dd>Eve measures a qubit in a random basis and sends on her result. When she guesses the basis wrong she disturbs it.</dd></div>
+    </dl>
+  </section>
+
+  <section class="panel" aria-labelledby="predict-h">
+    <h2 id="predict-h">8 · Predict a new case</h2>
+    <p>The jury may change one thing and ask what happens. Our answers, all from verified runs:</p>
+    <ul class="qa">
+      <li><span class="ask">Noise 2% instead of 3%?</span><span class="ans">Q_u 2.76%, key 51,695 bits.</span></li>
+      <li><span class="ask">Noise 4%?</span><span class="ans">Q_u 4.95%, key 34,472 bits.</span></li>
+      <li><span class="ask">A very clean channel, 1% noise?</span><span class="ans">Q_u 1.74%, key 61,083 bits: 18,227 more than at 3%.</span></li>
+      <li><span class="ask">Eve intercepts half of the qubits?</span><span class="ans">Q_u 16.21%, above 11%: the run aborts and no key is issued.</span></li>
+      <li><span class="ask">12% noise and no Eve at all?</span><span class="ans">Q_u 13.22%: abort. Noise alone is enough to stop the key.</span></li>
+      <li><span class="ask">Hoeffding instead of Clopper-Pearson?</span><span class="ans">Key 37,411 instead of 42,856.</span></li>
+      <li><span class="ask">The brief's literal Cascade, 24 / 24 / 24?</span><span class="ans">Key 28,842, and the first hash check mismatches.</span></li>
+      <li><span class="ask">The hash mismatches three times?</span><span class="ans">The key is discarded: no key, no message.</span></li>
+    </ul>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="event-h">
+      <h2 id="event-h">9 · At the event</h2>
+      <ol>
+        <li>Fill in <code>OrganiserTransport</code> once the organisers publish their API: routes and bit encodings.</li>
+        <li>Plug in their pre-agreed hash.</li>
+        <li>Check that Bob's key length matches the server's, and keep the hash-leak setting where they agree.</li>
+      </ol>
+    </section>
+    <section class="panel" aria-labelledby="lim-h">
+      <h2 id="lim-h">Limitations</h2>
+      <ul>
+        <li>Only a simulated Alice: the qubit transfer is a shortcut in <code>alice_sim.py</code>.</li>
+        <li>The organisers' API is not known yet; <code>OrganiserTransport</code> is an empty skeleton.</li>
+        <li>The hash is our own SHA-256 prefix and the Toeplitz seed layout is our own choice (<code>diag</code>).</li>
+        <li>The public channel is assumed to be authenticated; the brief does not cover authentication.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="jury-h">
+    <h2 id="jury-h">Say it to the jury</h2>
+    <ol class="jury">
+      <li><q>We cannot tell noise from Eve, so we charge every error to Eve: that is why only 42,856 of 200,000 qubits become key.</q></li>
+      <li><q>Every bit Alice and Bob reveal, test bits, parities and the hash, is counted and subtracted before privacy amplification.</q></li>
+      <li><q>If the error bound passes 11% or the key length goes negative, we abort instead of issuing a key we cannot defend.</q></li>
+      <li><q>Each choice was tested against its alternative: Hoeffding gives 37,411 bits, and the literal Cascade gives 28,842 and a hash mismatch.</q></li>
+    </ol>
+  </section>
+
+  <footer>Local simulation against the bundled Alice simulator. Numbers come from a traced run of <code>python bob.py --qber 0.03 --eve 0.01 --seed 1</code> and from <code>bb84_bob/</code>; formulas are transcribed from the brief.</footer>
+</main>
+</body>
+</html>

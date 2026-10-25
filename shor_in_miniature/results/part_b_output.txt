@@ -1,0 +1,95 @@
+==============================================================================
+1. PUBLISHED ESTIMATES (all assume surface code on a 2D grid unless noted)
+==============================================================================
+Gidney+Ekera 2019 (arXiv:1905.09749), 28-factory row: 20 M qubits, 0.31 d = 7.4 h, volume 5.9 Mqubit-days
+   other rows of their Table 2: 14 factories 19 M / 0.36 d; 1 factory 16 M / 6 d  (fewer factories -> fewer qubits, slower)
+Gidney 2025 (arXiv:2505.15917): hot patch 2(25+1)^2 = 1352; cold storage 1280*430 = 550,400; hot 131*1352 = 177,112; compute region 7*18*1352 = 170,352
+   total = 897,864 (paper: 897864, reported as '<1 million' for slack)
+   runtime = 12.07 h * 9.2 shots / 24 / 0.933 = 4.96 days (paper 4.96, 'less than a week')
+   volume = 897,864 * 4.96 d = 4.45 Mqubit-days
+Pinnacle 2026 (arXiv:2602.11457v2, Table VI, 1 us, p=1e-3): 94 kq (<=1 month), 135 kq (<=1 week), 381 kq (<=1 day)
+   -> the paper DOES state runtimes (the brief says 'not stated'); needs non-local qubit connectivity; simulation, not hardware
+Google 2026 (arXiv:2603.28846): ECC-256 (not RSA); 18-23 min, or 9-12 min once 'primed'; <500,000 qubits; circuits withheld (zero-knowledge proof)
+
+--- 1b. why the estimates trade qubits against runtime
+qubit ratio 2019 -> 2025: 20e6 / 897,864 = 22.3x fewer
+runtime ratio: 4.96 d / 0.31 d = 16.0x longer   (vs the 8 h headline: 14.9x; headline '<1 week' vs 8 h: 21x, the brief's 'about 20x')
+volume ratio: 5.9 / 4.45 = 1.33x   -> the 20x qubit cut is mostly time bought with qubits, true algorithmic gain ~1.3x in volume
+Pinnacle at fixed hardware: 94 kq * 30 d = 2.82 Mqd;  135 kq * 7 d = 0.94;  381 kq * 1 d = 0.38  (the same machine family, runtime knob: 4x qubits buys 30x speed)
+Pinnacle vs Gidney 2025: 6.7x fewer qubits at about one week
+
+==============================================================================
+2. TOY SURFACE-CODE MODEL  p_L = 0.1 (p/p_th)^((d+1)/2), p_th = 1 %, 2 d^2 physical per logical, need L*T*p_L < 0.1
+==============================================================================
+Judges' worked example: L = 1500, 5 days at 1 us: T = 5 * 86400 / 1e-6 = 4.320e+11 cycles
+   L*T = 6.480e+14; need p_L < 0.1 / (L*T) = 1.543e-16
+   d = 23: p_L = 0.1 * (0.1)^12 = 1.0e-13;  L*T*p_L = 64.8  >= 0.1 too large
+   d = 25: p_L = 0.1 * (0.1)^13 = 1.0e-14;  L*T*p_L = 6.48  >= 0.1 too large
+   d = 27: p_L = 0.1 * (0.1)^14 = 1.0e-15;  L*T*p_L = 0.648  >= 0.1 too large
+   d = 29: p_L = 0.1 * (0.1)^15 = 1.0e-16;  L*T*p_L = 0.0648  < 0.1 OK
+   d = 31: p_L = 0.1 * (0.1)^16 = 1.0e-17;  L*T*p_L = 0.00648  < 0.1 OK
+   smallest odd d = 29;  2 d^2 = 1,682 physical per logical;  total = 1500 * 1,682 = 2,523,000 (about 2.52 million)
+   (with Gidney-Ekera's 2(d+1)^2 the same d gives 1,800 per logical, 2,700,000 total: +7 %)
+   if T is forgotten (L*p_L < 0.1 only): d = 7, total = 147,000  -> wrong by a factor 17
+
+--- 2b. sensitivity (L = 1500, 5 days, 1 us unless varied)
+   p        d    2d^2   total
+   0.05 %   23    1058  1.59e+06
+   0.10 %   29    1682  2.52e+06
+   0.20 %   43    3698  5.55e+06
+   0.30 %   57    6498  9.75e+06
+   0.50 %   99   19602  2.94e+07
+   runtime (p = 0.1 %):
+   8 hours  d = 27  total = 2.19e+06
+   5 days   d = 29  total = 2.52e+06
+   1 year   d = 33  total = 3.27e+06
+   -> total depends on T only through d, which grows with log(L*T): 1 year costs only 1.29x the 5-day total.  Time does NOT buy qubits in the toy model; it buys fewer factories/parallelism.
+
+--- 2c. toy model on Gidney 2025's own inputs
+   L = 1399 logical (Table 5), runtime 4.96 d = 4.285e+11 cycles at 1 us, p = 0.1 %: d = 29, 2d^2 = 1,682, total = 2,353,118
+   toy / paper = 2,353,118 / 897,864 = 2.6x  (same order of magnitude, 10^6)
+   Gidney's own per-patch fit: p_L(d=25) = 1e-15; the toy gives p_L(25) = 1e-14 -> toy is 10x more pessimistic per patch
+   what the toy leaves out and Gidney exploits: cold storage 430 vs 1352 physical per logical = 3.1x denser (yoked surface codes),
+   idle qubits all hot would be (1280 + 131 + 126) * 1352 = 2,078,024 instead of 897,864
+   toy also ignores magic-state factories (cultivation makes them small: six 3x4 patches in Gidney 2025) and routing
+   approximate residue arithmetic: 1399 logical qubits vs 3n + 0.002 n lg n = 6,189 in 2019: 4.4x fewer
+
+==============================================================================
+3. TODAY'S HARDWARE vs THE REQUIREMENT
+==============================================================================
+   Gidney 2025 (897,864)    / Helios 98 qubits   =      9162x   ;  / 1,121 qubits (unverified) =     801x
+   Pinnacle (<100,000)      / Helios 98 qubits   =      1020x   ;  / 1,121 qubits (unverified) =      89x
+   toy example (2.52 M)     / Helios 98 qubits   =     25745x   ;  / 1,121 qubits (unverified) =    2251x
+   largest verified array (6,100 atomic qubits, 2403.12021): Gidney 2025 147x ; Pinnacle 1e5 16x ; toy 414x  (qubit count only, no gate error at that scale)
+   clock: if a slow-clock machine ran a 1 ms cycle (1000x the assumed 1 us, illustrative), Gidney's 4.96 days become 13.6 years
+   two-qubit error: Helios 7.9e-04 vs assumed 1e-3 -> already 1.27x better than the assumption (on 98 qubits, not 1e6)
+   so the error-rate gap is ~1x on small devices; the gap is SCALE: qubits (about 10^3 - 10^4 x), and error-correction quality at scale
+   logical error needed per qubit per cycle (toy example): 1.54e-16;  best measured logical memory (Willow d=7): 1.43e-03  -> gap 9.3e+12x
+   if suppression stayed at Willow's Lambda = 2.14 (toy assumes p_th/p = 10): d = 87, 2 d^2 = 15,138 per logical, total 22,707,000 = 9.0x the toy's 2,523,000
+   logical qubits: need 1399; Willow shows 1 logical memory qubit (one patch) -> 1399x ; decoder: 63/10 = 6.3x slower than the assumed 10 us reaction time (63 us at d=5)
+   (do NOT multiply the qubit gap by the error gap: p/p_th sets d, which sets the qubits per logical -- they are coupled)
+
+==============================================================================
+4. TIMELINE (explicit assumptions; a what-if, not a forecast)
+==============================================================================
+   Requirement history: 2012 Fowler et al. 1,000,000,000 qubits -> 2019 20,000,000 -> 2025 897,864 -> 2026 94,000 (month) / 135,000 (week)
+   2012 -> 2026: 10,638x fewer = 13.4 halvings in 14 years: the requirement halved every 1.05 years, with the same 0.1 % error assumption
+   Assumptions [own]: (A1) 2D-grid hardware keeps 0.1 % error and 1 us cycle while it scales (optimistic);
+   (A2) physical qubit count doubles every D years; (A3) the requirement keeps halving every H years (H = inf: algorithms stop improving);
+   (A4) start = 98 qubits (Helios, verified) or ~1,121 qubits (largest announced array, not re-verified, no 2q error published at that scale)
+   years to close the gap = log2(requirement / start) / (1/D + 1/H);  calendar year = 2026 + that
+   start 98 qubits: gap 9,162x = 13.2 doublings
+   start 1121 qubits: gap 801x = 9.6 doublings
+            start 98            start 1,121
+   D      H=inf    H=3 y      H=inf    H=3 y
+   1 y      2039     2036     2036     2033
+   2 y      2052     2042     2045     2038
+   3 y      2065     2046     2055     2040
+   history: the requirement halved every 1.0 years since 2012; extrapolating that is not credible, hence H = inf or 3 y
+
+--- 4b. organisational consequence: harvest now, decrypt later (Mosca inequality: act if X + Y > Z)
+   X = years data must stay secret, Y = years to migrate, Z = years until a machine exists; [own] X = 10, Y = 7 (large organisation)
+   X + Y = 17 years; migration is already late if Z <= 17, i.e. if a machine arrives before 2043
+   7 of the 12 scenarios above arrive before 2043; earliest 2033, latest 2065
+   key exchange (ML-KEM, NIST FIPS 203) must move first, because recorded traffic can be decrypted later;
+   signatures (ML-DSA, FIPS 204) matter at forgery time.  Google's 2026 paper itself urges migration 'without delay' (arXiv:2603.28846 abstract).

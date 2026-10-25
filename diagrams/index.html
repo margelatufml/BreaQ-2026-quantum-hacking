@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BreaQ Hacking Diagrams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="diagrams.css">
+</head>
+<body>
+<main class="page">
+  <header>
+    <span class="eyebrow">BreaQ 2026 · Quantum Hacking Track</span>
+    <h1>Solved challenges, as diagrams</h1>
+    <p class="lede">One page per solved challenge: the flow from input to output, the real numbers from our runs, and three lines to say to the jury.</p>
+  </header>
+
+  <div class="cards">
+    <a href="ch1-trust-no-input.html">
+      <span class="eyebrow">Challenge 1</span>
+      <h2>Trust No Input</h2>
+      <p>A correct quantum result, broken afterwards by classical code: a display setting is used inside a security decision.</p>
+      <span class="go">Open the flow →</span>
+    </a>
+    <a href="quantum-dice.html">
+      <span class="eyebrow">Quantum Dice · 50 pts</span>
+      <h2>Random or Rigged?</h2>
+      <p>A perfectly balanced histogram hides a service that replays the same bits; a replay check catches all 20 faulty services. Every step explained, IN → DO → OUT.</p>
+      <span class="go">Open the flow →</span>
+    </a>
+    <a href="shor-in-miniature.html">
+      <span class="eyebrow">Shor in Miniature · 140 pts</span>
+      <h2>Shor in Miniature</h2>
+      <p>The circuit only finds a period; classical maths turns it into factors. One real run of factor(21), every step explained, plus Part B for RSA-2048.</p>
+      <span class="go">Open the flow →</span>
+    </a>
+    <a href="bb84-bob.html">
+      <span class="eyebrow">Catch the Eavesdropper</span>
+      <h2>BB84: Bob's Side</h2>
+      <p>200,000 noisy qubits become a 42,856-bit secret key, because every error is paid for as if Eve caused it.</p>
+      <span class="go">Open the flow →</span>
+    </a>
+  </div>
+
+  <section class="panel" aria-labelledby="pattern-h">
+    <h2 id="pattern-h">The idea that repeats</h2>
+    <p>Every challenge hands you something that looks like evidence and asks whether it really proves the claim: a count that is correct but misread, a histogram that looks fair but is replayed, factors that could come from luck, an error rate that could be noise or an attacker. The scoring rewards finding the trust boundary, running one controlled experiment, and saying honestly what the evidence does not prove.</p>
+  </section>
+
+  <footer>Not included: Challenge 2 (The Treacherous Transpiler) and the Hardware Surprise, which is revealed during the event.</footer>
+</main>
+</body>
+</html>

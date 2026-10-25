@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trust No Input Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="diagrams.css">
+</head>
+<body>
+<main class="page">
+  <nav class="crumbs"><a href="index.html">All diagrams</a><a href="quantum-dice.html">Quantum Dice</a><a href="shor-in-miniature.html">Shor in Miniature</a><a href="bb84-bob.html">BB84</a></nav>
+
+  <header>
+    <span class="eyebrow">BreaQ 2026 · Quantum Hacking · Challenge 1</span>
+    <h1>Trust No Input</h1>
+    <p class="lede">The quantum result is correct every time. Afterwards, classical code applies an untrusted display setting inside the MATCH / MISMATCH decision, so valid assets are rejected.</p>
+    <dl class="facts">
+      <div><dt>Input</dt><dd>4-bit fingerprint + map</dd></div>
+      <div><dt>Bug location</dt><dd>service.py:115</dd></div>
+      <div><dt>Fix tested on</dt><dd>384 runs, 6,160 checks</dd></div>
+      <div><dt>Exploit reach</dt><dd>70 of 256 pairs</dd></div>
+    </dl>
+  </header>
+
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">The flow, for case MIG-DELTA</h2>
+    <ul class="legend">
+      <li><span class="tag quantum">quantum</span> runs on the simulator</li>
+      <li><span class="tag classical">classical</span> Python after the run</li>
+      <li><span class="tag bug">bug</span> where it breaks</li>
+      <li><span class="tag check">check</span> the decision</li>
+    </ul>
+    <ol class="flow">
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">input</span><h3>Fingerprint 1010</h3></div>
+          <p>The asset's 4-bit ID, one bit per slot: alpha, beta, gamma, delta.</p>
+        </div>
+        <p class="note">slot i = qubit i<br>registry expects <b>1010</b></p>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Bernstein-Vazirani probe</h3></div>
+          <p>Hides the fingerprint in CX gates and reads it back in one run. In effect it applies X to every bit that is 1.</p>
+        </div>
+        <p class="note">5 qubits, ideal simulator<br>512 shots</p>
+      </li>
+      <li class="stage quantum">
+        <div class="card">
+          <div class="card-head"><span class="tag quantum">quantum</span><h3>Raw counts {'0101': 512}</h3></div>
+          <p>One key on every shot: the result is deterministic, so this is not noise.</p>
+        </div>
+        <p class="note">Qiskit prints qubit 0<br>on the <b>right</b></p>
+      </li>
+      <li class="stage classical">
+        <div class="card">
+          <div class="card-head"><span class="tag classical">classical</span><h3>Reverse the key → 1010</h3></div>
+          <p>Converts the printed key into canonical slot order q0, q1, q2, q3.</p>
+        </div>
+        <p class="note"><code>key[::-1]</code><br>1010 = registry <span class="good">correct</span></p>
+      </li>
+      <li class="stage bug">
+        <div class="card">
+          <div class="card-head"><span class="tag bug">bug</span><h3>Apply compatibility_map [1,0,2,3] → 0110</h3></div>
+          <p>A legacy display order from an imported, untrusted manifest. It should only change how the result is shown.</p>
+        </div>
+        <p class="note">reported[i] = canonical[map[i]]<br><span class="hit">display step used in the decision</span></p>
+      </li>
+      <li class="stage check">
+        <div class="card">
+          <div class="card-head"><span class="tag check">check</span><h3>0110 == registry 1010 ?</h3></div>
+          <p>The reordered string is compared with the canonical registry value.</p>
+          <span class="branch">MISMATCH: a valid asset is rejected</span>
+        </div>
+        <p class="note">service.py:115<br>decision uses <b>reported</b></p>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="cases-h">
+    <h2 id="cases-h">Three versions of the same fingerprint</h2>
+    <p class="section-intro">The reversed key always equals the registry, so the circuit is fine. Only the cases with a non-identity map fail. The two calibration cases read the same backwards and use the identity map, so they could never show the bug.</p>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Case</th><th>Registry</th><th>Raw key</th><th>key[::-1]</th><th>Map</th><th>Reported</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>CAL-ALPHA</td><td class="mono">1001</td><td class="mono">1001</td><td class="mono">1001</td><td class="mono">[0,1,2,3]</td><td class="mono">1001</td><td>MATCH</td></tr>
+          <tr><td>CAL-BETA</td><td class="mono">0110</td><td class="mono">0110</td><td class="mono">0110</td><td class="mono">[0,1,2,3]</td><td class="mono">0110</td><td>MATCH</td></tr>
+          <tr class="highlight"><td>MIG-DELTA</td><td class="mono">1010</td><td class="mono">0101</td><td class="mono">1010</td><td class="mono">[1,0,2,3]</td><td class="mono">0110</td><td>MISMATCH</td></tr>
+          <tr class="highlight"><td>INCIDENT-7</td><td class="mono">1100</td><td class="mono">0011</td><td class="mono">1100</td><td class="mono">[3,1,2,0]</td><td class="mono">0101</td><td>MISMATCH</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel" aria-labelledby="fix-h">
+      <h2 id="fix-h">The fix</h2>
+      <ol>
+        <li>Decode from the counts only: take the majority key and reverse it.</li>
+        <li>Compare with the registry. Never pass the map into the decision.</li>
+        <li>Fail closed: a tie, an empty result or a malformed key gives MISMATCH.</li>
+        <li>Use the map afterwards, only to format the display.</li>
+      </ol>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Decoder tested on all 384 runs</th><th class="num">Wrong results</th></tr></thead>
+          <tbody>
+            <tr class="pass"><td>Secure decision (ours)</td><td class="num">0</td></tr>
+            <tr><td>Original logic (map applied)</td><td class="num">264</td></tr>
+            <tr><td>No reversal</td><td class="num">288</td></tr>
+            <tr><td>Hard-coded to the 4 demo cases</td><td class="num">288</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="exploit-h">
+      <h2 id="exploit-h">The exploit</h2>
+      <p>An attacker who can edit only the map can reorder bits but never create or delete a 1. A target is reachable only if it is an anagram of the source.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>1s in the source</th><th class="num">0</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th></tr></thead>
+          <tbody>
+            <tr><td>Reachable targets</td><td class="num">1</td><td class="num">4</td><td class="num">6</td><td class="num">4</td><td class="num">1</td></tr>
+            <tr><td>Maps that change it (of 24)</td><td class="num">0</td><td class="num">18</td><td class="num">20</td><td class="num">18</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Worst case, a false accept: an asset that really encodes <code>1100</code> is reported as <code>0011</code> with map <code>(2,3,0,1)</code>, so it would match a registry entry of 0011.</p>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="jury-h">
+    <h2 id="jury-h">Say it to the jury</h2>
+    <ol class="jury">
+      <li><q>Same counts with a different map gives a different decision: the metadata decides, not the qubits.</q></li>
+      <li><q>The circuit and the measurement are correct in every case; the bug is a display step inside an authorization check.</q></li>
+      <li><q>Validating that the map is a permutation proves its shape, not that it is safe to use in a security decision.</q></li>
+    </ol>
+  </section>
+
+  <footer>Local simulation with Qiskit's ideal BasicSimulator. Numbers come from the verified runs of the CH1 notebook code.</footer>
+</main>
+</body>
+</html>
